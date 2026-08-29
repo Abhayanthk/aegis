@@ -8,8 +8,8 @@ const baseUrl = process.env.TRUEFORGE_URL || "http://localhost:8790";
 const apiKey = process.env.TRUEFORGE_API_KEY || ""; 
 
 export const trueForgeClient = new TrueForge({
-  environment: baseUrl,
-  token: apiKey,
+  baseUrl,
+  token: apiKey || undefined,
 });
 
 export const AGENT_NAME = process.env.AGENT_NAME || "aegis-orchestrator";
