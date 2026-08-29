@@ -1,0 +1,183 @@
+{
+  "projects": [
+    {
+      "id": "prj_orders",
+      "name": "orders-api",
+      "repository": "acme/orders-api",
+      "branch": "main",
+      "status": "verified",
+      "latestInvestigation": {
+        "id": "A91F",
+        "finding": "Event-loop starvation",
+        "status": "verified",
+        "time": "12 min ago",
+        "metric": {
+          "label": "Event-loop p99",
+          "before": "4,217 ms",
+          "after": "3.2 ms"
+        },
+        "tests": "100/100"
+      },
+      "lastActivity": "Pull request #42 opened"
+    },
+    {
+      "id": "prj_payments",
+      "name": "payment-service",
+      "repository": "acme/payment-service",
+      "branch": "main",
+      "status": "investigating",
+      "latestInvestigation": {
+        "id": "B72C",
+        "finding": "Event-loop starvation",
+        "status": "running",
+        "stage": "Diagnosing",
+        "time": "4 min ago"
+      },
+      "lastActivity": "Runtime Profiler collecting evidence"
+    },
+    {
+      "id": "prj_inventory",
+      "name": "inventory-api",
+      "repository": "acme/inventory-api",
+      "branch": "main",
+      "status": "healthy",
+      "latestInvestigation": {
+        "id": "C18D",
+        "finding": "No actionable runtime issue",
+        "status": "verified",
+        "time": "Yesterday"
+      },
+      "lastActivity": "Investigation completed"
+    },
+    {
+      "id": "prj_auth",
+      "name": "auth-service",
+      "repository": "acme/auth-service",
+      "branch": "main",
+      "status": "failed",
+      "latestInvestigation": {
+        "id": "D44A",
+        "finding": "Event-loop starvation",
+        "status": "failed",
+        "attempts": 3,
+        "time": "Yesterday"
+      },
+      "lastActivity": "Verification failed after 3 attempts"
+    },
+    {
+      "id": "prj_search",
+      "name": "search-api",
+      "repository": "acme/search-api",
+      "branch": "main",
+      "status": "verified",
+      "latestInvestigation": {
+        "id": "E29B",
+        "finding": "CPU-bound synchronous operation",
+        "status": "verified",
+        "time": "2 days ago",
+        "metric": {
+          "label": "Target p99",
+          "before": "1,842 ms",
+          "after": "74 ms"
+        },
+        "tests": "86/86"
+      },
+      "lastActivity": "Pull request #31 merged"
+    },
+    {
+      "id": "prj_notifications",
+      "name": "notifications-worker",
+      "repository": "acme/notifications-worker",
+      "branch": "main",
+      "status": "new",
+      "latestInvestigation": null,
+      "lastActivity": "Project added"
+    },
+    {
+      "id": "prj_catalog",
+      "name": "catalog-service",
+      "repository": "acme/catalog-service",
+      "branch": "develop",
+      "status": "verified",
+      "latestInvestigation": {
+        "id": "F83E",
+        "finding": "Event-loop starvation",
+        "status": "verified",
+        "time": "3 days ago",
+        "metric": {
+          "label": "Health availability",
+          "before": "41%",
+          "after": "100%"
+        },
+        "tests": "142/142"
+      },
+      "lastActivity": "Qodo review passed"
+    },
+    {
+      "id": "prj_gateway",
+      "name": "api-gateway",
+      "repository": "acme/api-gateway",
+      "branch": "main",
+      "status": "stopped",
+      "latestInvestigation": {
+        "id": "G17A",
+        "finding": "Insufficient runtime evidence",
+        "status": "stopped",
+        "time": "Aug 27"
+      },
+      "lastActivity": "Investigation stopped"
+    }
+  ],
+  "recentActivity": [
+    {
+      "id": "act_01",
+      "projectId": "prj_orders",
+      "type": "verified",
+      "title": "Investigation #A91F verified",
+      "time": "12 min ago"
+    },
+    {
+      "id": "act_02",
+      "projectId": "prj_payments",
+      "type": "investigating",
+      "title": "Diagnosis in progress",
+      "time": "4 min ago"
+    },
+    {
+      "id": "act_03",
+      "projectId": "prj_search",
+      "type": "pull_request",
+      "title": "Pull request #31 merged",
+      "time": "2 days ago"
+    },
+    {
+      "id": "act_04",
+      "projectId": "prj_auth",
+      "type": "failed",
+      "title": "Verification failed",
+      "time": "Yesterday"
+    }
+  ],
+  "filters": [
+    {
+      "label": "All",
+      "value": "all"
+    },
+    {
+      "label": "Active",
+      "value": "investigating"
+    },
+    {
+      "label": "Verified",
+      "value": "verified"
+    },
+    {
+      "label": "Failed",
+      "value": "failed"
+    },
+    {
+      "label": "No investigations",
+      "value": "new"
+    }
+  ]
+}
