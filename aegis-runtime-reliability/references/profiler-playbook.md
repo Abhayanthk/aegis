@@ -41,9 +41,13 @@ Using the Repository Analyst's findings, create an experiment config JSON:
 
 ### 2. Install Dependencies
 
-Before running experiments:
+The Daytona sandbox may not have Node.js or `npm` pre-installed. Before running experiments, verify the environment and install dependencies:
 
 ```bash
+# 1. Install Node.js and npm if missing
+apt-get update && apt-get install -y nodejs npm
+
+# 2. Install Aegis script dependencies
 cd scripts && npm install
 ```
 
