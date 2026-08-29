@@ -18,14 +18,16 @@ Using the Repository Analyst's findings, create an experiment config JSON:
   "target_endpoint": "<full URL of the endpoint under test>",
   "request_method": "GET|POST|PUT|...",
   "request_payload": { "...": "..." },
-  "duration_seconds": 30,
+  "duration_seconds": 20,
   "connections": 50,
   "rate": 0,
+  "pipelining": 1,
   "health_probe_path": "<full URL of the health endpoint>",
-  "health_probe_interval_ms": 200,
+  "health_probe_interval_ms": 500,
   "functional_test_command": "<command to run functional tests>",
-  "warmup_seconds": 5,
-  "startup_timeout_ms": 30000
+  "warmup_seconds": 3,
+  "startup_timeout_ms": 30000,
+  "event_loop_resolution_ms": 20
 }
 ```
 
@@ -33,8 +35,8 @@ Using the Repository Analyst's findings, create an experiment config JSON:
 - `target_endpoint` must be the suspect endpoint identified by the Analyst.
 - `health_probe_path` must be a lightweight endpoint (e.g., `/health`).
 - `functional_test_command` must run the repo's actual test suite.
-- `connections` should be high enough to expose starvation (50-100 typical).
-- `duration_seconds` should be long enough for stable measurements (30s minimum).
+- `connections` should be high enough to expose starvation (default: 50).
+- `duration_seconds` should be long enough for stable measurements (default: 20s).
 - Use a `request_payload` that triggers the suspect code path.
 
 ### 2. Install Dependencies

@@ -53,14 +53,16 @@ if (!args.config || !args.output) {
  * @property {string}   target_endpoint    - Full URL of the endpoint under test (e.g. http://localhost:3000/api/heavy).
  * @property {Object}   [request_payload]  - Optional JSON body sent with each request.
  * @property {string}   [request_method]   - HTTP method (default: GET).
- * @property {number}   duration_seconds   - How long Autocannon drives load.
- * @property {number}   connections        - Concurrent connections for Autocannon.
+ * @property {number}   duration_seconds   - How long Autocannon drives load (default 20).
+ * @property {number}   connections        - Concurrent connections for Autocannon (default 50).
  * @property {number}   [rate]             - Requests/sec cap (0 = unlimited, default).
+ * @property {number}   [pipelining]       - Autocannon pipelining factor (default 1).
  * @property {string}   health_probe_path  - Full URL of the health/liveness endpoint.
- * @property {number}   health_probe_interval_ms - Interval (ms) between health probes.
+ * @property {number}   health_probe_interval_ms - Interval (ms) between health probes (default 500).
  * @property {string}   functional_test_command - Shell command to run functional tests AFTER load.
- * @property {number}   [warmup_seconds]   - Optional warmup duration before measurement.
+ * @property {number}   [warmup_seconds]   - Optional warmup duration before measurement (default 3).
  * @property {number}   [startup_timeout_ms] - Max ms to wait for target readiness (default 30000).
+ * @property {number}   [event_loop_resolution_ms] - ELD monitoring resolution (default 20).
  * @property {Object}   [protocol]         - Extra protocol metadata folded into the hash.
  */
 
@@ -94,10 +96,12 @@ function computeProtocolHash(cfg) {
     request_payload: cfg.request_payload ?? null,
     request_method: (cfg.request_method ?? 'GET').toUpperCase(),
     duration_seconds: cfg.duration_seconds,
-    connections: cfg.connections,
+    connections: cfg.connections ?? 50,
     rate: cfg.rate ?? 0,
+    pipelining: cfg.pipelining ?? 1,
     health_probe_path: cfg.health_probe_path,
-    health_probe_interval_ms: cfg.health_probe_interval_ms,
+    health_probe_interval_ms: cfg.health_probe_interval_ms ?? 500,
+    event_loop_resolution_ms: cfg.event_loop_resolution_ms ?? 20,
     protocol: cfg.protocol ?? null,
   });
   return createHash('sha256').update(canonical).digest('hex');
@@ -223,8 +227,9 @@ async function driveLoad(cfg) {
 
   const opts = {
     url: cfg.target_endpoint,
-    duration: cfg.duration_seconds,
-    connections: cfg.connections,
+    duration: cfg.duration_seconds ?? 20,
+    connections: cfg.connections ?? 50,
+    pipelining: cfg.pipelining ?? 1,
     ...(cfg.rate ? { overallRate: cfg.rate } : {}),
     ...(cfg.request_method && cfg.request_method.toUpperCase() !== 'GET'
       ? { method: cfg.request_method.toUpperCase() }
@@ -355,9 +360,10 @@ async function main() {
     // -----------------------------------------------------------------------
     // 4. Start event-loop delay monitoring
     // -----------------------------------------------------------------------
-    const eld = monitorEventLoopDelay({ resolution: 10 });
+    const eldResolution = config.event_loop_resolution_ms ?? 20;
+    const eld = monitorEventLoopDelay({ resolution: eldResolution });
     eld.enable();
-    console.log('[experiment] Event-loop delay monitoring enabled.');
+    console.log(`[experiment] Event-loop delay monitoring enabled (resolution: ${eldResolution}ms).`);
 
     // -----------------------------------------------------------------------
     // 5. Drive load with Autocannon

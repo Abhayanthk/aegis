@@ -9,6 +9,20 @@ description: >
 
 # AEGIS Runtime Reliability — Event-Loop Starvation
 
+## What event-loop starvation is (the failure being reproduced)
+
+Node.js runs JavaScript on a single main thread. When a request handler does
+synchronous CPU-bound work (a long loop, sync crypto/hashing, large JSON
+serialization, image/PDF work on the main thread), the event loop cannot process
+anything else while that work runs — every other pending request, timer, and I/O
+callback is blocked. The tell-tale symptom: hammering ONE heavy endpoint makes
+UNRELATED requests (e.g. GET /healthz) slow down or time out, and measured
+event-loop delay spikes. The fix moves that CPU work off the main thread
+(worker_threads) or yields cooperatively.
+
+The experiment only counts as a real reproduction if it correlates THREE signals
+under load: (1) high event-loop delay, (2) degraded independent health traffic,
+(3) the heavy endpoint's own latency. One number alone is not proof.
 ## Guiding Principle
 
 **The LLM reasons and orchestrates; deterministic scripts do the measuring and
@@ -157,7 +171,18 @@ node scripts/verify.mjs --baseline <baseline/metrics.json> \
 
 ---
 
-## Experiment Configuration
+## Load profile — concrete defaults (configurable inputs, IDENTICAL for baseline and candidate)
+
+The Runtime Profiler supplies these; document these defaults in run_experiment.mjs:
+- Autocannon: connections (virtual users) = 50, duration = 20s, pipelining = 1
+- Warmup: 3s before measurement starts
+- Independent health probe: one GET /healthz every 500ms for the full duration
+- Event-loop sampling resolution: 20ms
+
+These are INPUTS, not hard-coded constants — but baseline and candidate MUST use
+the exact same values. That identity is precisely what protocol_hash captures. If
+a target needs heavier load to starve, raise connections; NEVER change the numbers
+between baseline and candidate, or the comparison is invalid.
 
 Create an experiment config JSON matching this schema before running:
 
@@ -167,14 +192,16 @@ Create an experiment config JSON matching this schema before running:
   "target_endpoint": "http://localhost:3000/api/heavy-computation",
   "request_method": "POST",
   "request_payload": { "size": 10000 },
-  "duration_seconds": 30,
+  "duration_seconds": 20,
   "connections": 50,
   "rate": 0,
+  "pipelining": 1,
   "health_probe_path": "http://localhost:3000/health",
-  "health_probe_interval_ms": 200,
+  "health_probe_interval_ms": 500,
   "functional_test_command": "node --test test/",
-  "warmup_seconds": 5,
-  "startup_timeout_ms": 30000
+  "warmup_seconds": 3,
+  "startup_timeout_ms": 30000,
+  "event_loop_resolution_ms": 20
 }
 ```
 
