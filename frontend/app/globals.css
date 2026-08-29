@@ -1,0 +1,996 @@
+@import url('https://fonts.googleapis.com/css2?family=Google+Sans:ital,opsz,wght@0,17..18,400..700;1,17..18,400..700&family=Lato:ital,wght@0,100;0,300;0,400;0,700;0,900;1,100;1,300;1,400;1,700;1,900&display=swap');
+
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-geist-mono);
+  --animate-skeleton: skeleton 2s -1s infinite linear;
+  --font-heading: var(--font-sans);
+  --animate-caret-blink: 1s ease-out infinite caret-blink;
+  --animate-toast-success-odd: toast-success-odd 0.32s cubic-bezier(0.5, 1, 0.89, 1);
+  --animate-toast-success-even: toast-success-even 0.32s cubic-bezier(0.5, 1, 0.89, 1);
+  --animate-toast-error-odd: toast-error-odd 0.28s cubic-bezier(0.5, 1, 0.89, 1);
+  --animate-toast-error-even: toast-error-even 0.28s cubic-bezier(0.5, 1, 0.89, 1);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-warning: var(--warning);
+  --color-success-foreground: var(--success-foreground);
+  --color-success: var(--success);
+  --color-info-foreground: var(--info-foreground);
+  --color-info: var(--info);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+  @keyframes skeleton {
+  to {
+    background-position: -200% 0;
+    }
+  }
+  @keyframes caret-blink {
+  0%, 70%, to {
+    opacity: 1;
+    }
+  20%, 50% {
+    opacity: 0;
+    }
+  }
+  @keyframes toast-success-odd {
+  0% {
+    scale: 1;
+    }
+  30% {
+    scale: 1.025;
+    }
+  60% {
+    scale: 0.99;
+    }
+  100% {
+    scale: 1;
+    }
+  }
+  @keyframes toast-error-odd {
+  0% {
+    translate: 0 0;
+    }
+  25% {
+    translate: -3px 0;
+    }
+  50% {
+    translate: 3px 0;
+    }
+  75% {
+    translate: -3px 0;
+    }
+  100% {
+    translate: 0 0;
+    }
+  }
+  @keyframes toast-success-even {
+  0% {
+    scale: 1;
+    }
+  30% {
+    scale: 1.025;
+    }
+  60% {
+    scale: 0.99;
+    }
+  100% {
+    scale: 1;
+    }
+  }
+  @keyframes toast-error-even {
+  0% {
+    translate: 0 0;
+    }
+  25% {
+    translate: -3px 0;
+    }
+  50% {
+    translate: 3px 0;
+    }
+  75% {
+    translate: -3px 0;
+    }
+  100% {
+    translate: 0 0;
+    }
+  }
+}
+
+@import url("https://fonts.googleapis.com/css2?family=Google+Sans:ital,opsz,wght@0,17..18,400..700;1,17..18,400..700&family=Lato:ital,wght@0,100;0,300;0,400;0,700;0,900;1,100;1,300;1,400;1,700;1,900&display=swap");
+
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+
+/* ============================================================
+   COSS UI / SHADCN
+   ============================================================ */
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  /* ── Semantic colors ─────────────────────────────────────── */
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  /* ── Charts ───────────────────────────────────────────────── */
+
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  /* ── Sidebar ──────────────────────────────────────────────── */
+
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  /* ── Typography ───────────────────────────────────────────── */
+
+  --font-sans: var(--font-text);
+  --font-heading: var(--font-display);
+  --font-mono: var(--font-mono-system);
+
+  /* ── Radius ───────────────────────────────────────────────── */
+
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+
+  /* ── Animations ───────────────────────────────────────────── */
+
+  --animate-skeleton: skeleton 2s -1s infinite linear;
+  --animate-caret-blink: 1s ease-out infinite caret-blink;
+
+  --animate-toast-success-odd:
+    toast-success-odd 0.32s cubic-bezier(0.5, 1, 0.89, 1);
+
+  --animate-toast-success-even:
+    toast-success-even 0.32s cubic-bezier(0.5, 1, 0.89, 1);
+
+  --animate-toast-error-odd:
+    toast-error-odd 0.28s cubic-bezier(0.5, 1, 0.89, 1);
+
+  --animate-toast-error-even:
+    toast-error-even 0.28s cubic-bezier(0.5, 1, 0.89, 1);
+
+
+  /* ── Keyframes ────────────────────────────────────────────── */
+
+  @keyframes skeleton {
+    to {
+      background-position: -200% 0;
+    }
+  }
+
+  @keyframes caret-blink {
+    0%,
+    70%,
+    100% {
+      opacity: 1;
+    }
+
+    20%,
+    50% {
+      opacity: 0;
+    }
+  }
+
+  @keyframes toast-success-odd {
+    0% {
+      scale: 1;
+    }
+
+    30% {
+      scale: 1.025;
+    }
+
+    60% {
+      scale: 0.99;
+    }
+
+    100% {
+      scale: 1;
+    }
+  }
+
+  @keyframes toast-success-even {
+    0% {
+      scale: 1;
+    }
+
+    30% {
+      scale: 1.025;
+    }
+
+    60% {
+      scale: 0.99;
+    }
+
+    100% {
+      scale: 1;
+    }
+  }
+
+  @keyframes toast-error-odd {
+    0% {
+      translate: 0 0;
+    }
+
+    25% {
+      translate: -3px 0;
+    }
+
+    50% {
+      translate: 3px 0;
+    }
+
+    75% {
+      translate: -3px 0;
+    }
+
+    100% {
+      translate: 0 0;
+    }
+  }
+
+  @keyframes toast-error-even {
+    0% {
+      translate: 0 0;
+    }
+
+    25% {
+      translate: -3px 0;
+    }
+
+    50% {
+      translate: 3px 0;
+    }
+
+    75% {
+      translate: -3px 0;
+    }
+
+    100% {
+      translate: 0 0;
+    }
+  }
+}
+
+
+/* ============================================================
+   THEME TOKENS
+   COSS UI / SHADCN + AEGIS
+   ============================================================ */
+
+:root {
+  /* ── COSS semantic colors ────────────────────────────────── */
+
+  --background: #ffffff;
+  --foreground: #09090b;
+
+  --card: #ffffff;
+  --card-foreground: #09090b;
+
+  --popover: #ffffff;
+  --popover-foreground: #09090b;
+
+  --primary: #5e6ad2;
+  --primary-foreground: #ffffff;
+
+  --secondary: #f4f4f5;
+  --secondary-foreground: #18181b;
+
+  --muted: #f4f4f5;
+  --muted-foreground: #71717a;
+
+  --accent: #f4f4f5;
+  --accent-foreground: #18181b;
+
+  --destructive: #dc2626;
+  --destructive-foreground: #ffffff;
+
+  --success: #16a34a;
+  --success-foreground: #ffffff;
+
+  --warning: #d97706;
+  --warning-foreground: #ffffff;
+
+  --info: #2563eb;
+  --info-foreground: #ffffff;
+
+  --border: #e4e4e7;
+  --input: #e4e4e7;
+  --ring: #5e6ad2;
+
+  /* ── Charts ───────────────────────────────────────────────── */
+
+  --chart-1: #5e6ad2;
+  --chart-2: #16a34a;
+  --chart-3: #2563eb;
+  --chart-4: #d97706;
+  --chart-5: #dc2626;
+
+  /* ── Sidebar ──────────────────────────────────────────────── */
+
+  --sidebar: #fafafa;
+  --sidebar-foreground: #09090b;
+  --sidebar-primary: #5e6ad2;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #f4f4f5;
+  --sidebar-accent-foreground: #18181b;
+  --sidebar-border: #e4e4e7;
+  --sidebar-ring: #5e6ad2;
+
+  /* ── Radius ───────────────────────────────────────────────── */
+
+  --radius: 0.625rem;
+
+
+  /* ==========================================================
+     AEGIS DESIGN SYSTEM
+     ========================================================== */
+
+  /* ── Brand ────────────────────────────────────────────────── */
+
+  --ds-primary: #5e6ad2;
+  --ds-on-primary: #ffffff;
+  --ds-primary-hover: #828fff;
+  --ds-primary-focus: #5e69d1;
+
+  /* ── Typography colors ───────────────────────────────────── */
+
+  --ds-ink: #111113;
+  --ds-ink-muted: #52525b;
+  --ds-ink-subtle: #71717a;
+  --ds-ink-tertiary: #a1a1aa;
+
+  /* ── Surfaces ─────────────────────────────────────────────── */
+
+  --ds-canvas: #ffffff;
+  --ds-surface-1: #fafafa;
+  --ds-surface-2: #f4f4f5;
+  --ds-surface-3: #eeeeef;
+  --ds-surface-4: #e4e4e7;
+
+  /* ── Borders ──────────────────────────────────────────────── */
+
+  --ds-hairline: #e4e4e7;
+  --ds-hairline-strong: #d4d4d8;
+  --ds-hairline-tertiary: #a1a1aa;
+
+  /* ── Inverse ──────────────────────────────────────────────── */
+
+  --ds-inverse-canvas: #010102;
+  --ds-inverse-surface-1: #0f1011;
+  --ds-inverse-surface-2: #141516;
+  --ds-inverse-ink: #ffffff;
+
+  /* ── Semantic ─────────────────────────────────────────────── */
+
+  --ds-brand-secure: #7a7fad;
+  --ds-semantic-success: #27a644;
+  --ds-semantic-overlay: #000000;
+
+  /* ── Radius ───────────────────────────────────────────────── */
+
+  --ds-rounded-xs: 4px;
+  --ds-rounded-sm: 6px;
+  --ds-rounded-md: 8px;
+  --ds-rounded-lg: 12px;
+  --ds-rounded-xl: 16px;
+  --ds-rounded-xxl: 24px;
+  --ds-rounded-pill: 9999px;
+  --ds-rounded-full: 9999px;
+
+  /* ── Spacing ──────────────────────────────────────────────── */
+
+  --ds-space-xxs: 4px;
+  --ds-space-xs: 8px;
+  --ds-space-sm: 12px;
+  --ds-space-md: 16px;
+  --ds-space-lg: 24px;
+  --ds-space-xl: 32px;
+  --ds-space-xxl: 48px;
+  --ds-space-section: 96px;
+
+  /* ── Font families ────────────────────────────────────────── */
+
+  --font-display: "Google Sans", system-ui, sans-serif;
+  --font-text: "Lato", system-ui, sans-serif;
+  --font-mono-system:
+    "SFMono-Regular",
+    "SF Mono",
+    "Roboto Mono",
+    ui-monospace,
+    Menlo,
+    Monaco,
+    Consolas,
+    monospace;
+
+  /* aliases for the original Aegis naming */
+
+  --ds-font-display: var(--font-display);
+  --ds-font-text: var(--font-text);
+  --ds-font-mono: var(--font-mono-system);
+
+
+  /* ── Display XL ───────────────────────────────────────────── */
+
+  --ds-type-display-xl-family: var(--ds-font-display);
+  --ds-type-display-xl-size: 80px;
+  --ds-type-display-xl-weight: 600;
+  --ds-type-display-xl-lh: 1.05;
+  --ds-type-display-xl-ls: -3px;
+
+  /* ── Display LG ───────────────────────────────────────────── */
+
+  --ds-type-display-lg-family: var(--ds-font-display);
+  --ds-type-display-lg-size: 56px;
+  --ds-type-display-lg-weight: 600;
+  --ds-type-display-lg-lh: 1.1;
+  --ds-type-display-lg-ls: -1.8px;
+
+  /* ── Display MD ───────────────────────────────────────────── */
+
+  --ds-type-display-md-family: var(--ds-font-display);
+  --ds-type-display-md-size: 40px;
+  --ds-type-display-md-weight: 600;
+  --ds-type-display-md-lh: 1.15;
+  --ds-type-display-md-ls: -1px;
+
+  /* ── Headline ─────────────────────────────────────────────── */
+
+  --ds-type-headline-family: var(--ds-font-display);
+  --ds-type-headline-size: 28px;
+  --ds-type-headline-weight: 600;
+  --ds-type-headline-lh: 1.2;
+  --ds-type-headline-ls: -0.6px;
+
+  /* ── Card title ───────────────────────────────────────────── */
+
+  --ds-type-card-title-family: var(--ds-font-display);
+  --ds-type-card-title-size: 22px;
+  --ds-type-card-title-weight: 500;
+  --ds-type-card-title-lh: 1.25;
+  --ds-type-card-title-ls: -0.4px;
+
+  /* ── Subhead ──────────────────────────────────────────────── */
+
+  --ds-type-subhead-family: var(--ds-font-display);
+  --ds-type-subhead-size: 20px;
+  --ds-type-subhead-weight: 400;
+  --ds-type-subhead-lh: 1.4;
+  --ds-type-subhead-ls: -0.2px;
+
+  /* ── Body LG ──────────────────────────────────────────────── */
+
+  --ds-type-body-lg-family: var(--ds-font-text);
+  --ds-type-body-lg-size: 18px;
+  --ds-type-body-lg-weight: 400;
+  --ds-type-body-lg-lh: 1.5;
+  --ds-type-body-lg-ls: -0.1px;
+
+  /* ── Body ─────────────────────────────────────────────────── */
+
+  --ds-type-body-family: var(--ds-font-text);
+  --ds-type-body-size: 16px;
+  --ds-type-body-weight: 400;
+  --ds-type-body-lh: 1.5;
+  --ds-type-body-ls: -0.05px;
+
+  /* ── Body SM ──────────────────────────────────────────────── */
+
+  --ds-type-body-sm-family: var(--ds-font-text);
+  --ds-type-body-sm-size: 14px;
+  --ds-type-body-sm-weight: 400;
+  --ds-type-body-sm-lh: 1.5;
+  --ds-type-body-sm-ls: 0;
+
+  /* ── Caption ──────────────────────────────────────────────── */
+
+  --ds-type-caption-family: var(--ds-font-text);
+  --ds-type-caption-size: 12px;
+  --ds-type-caption-weight: 400;
+  --ds-type-caption-lh: 1.4;
+  --ds-type-caption-ls: 0;
+
+  /* ── Button ───────────────────────────────────────────────── */
+
+  --ds-type-button-family: var(--ds-font-text);
+  --ds-type-button-size: 14px;
+  --ds-type-button-weight: 500;
+  --ds-type-button-lh: 1.2;
+  --ds-type-button-ls: 0;
+
+  /* ── Eyebrow ──────────────────────────────────────────────── */
+
+  --ds-type-eyebrow-family: var(--ds-font-text);
+  --ds-type-eyebrow-size: 13px;
+  --ds-type-eyebrow-weight: 500;
+  --ds-type-eyebrow-lh: 1.3;
+  --ds-type-eyebrow-ls: 0.4px;
+
+  /* ── Mono ─────────────────────────────────────────────────── */
+
+  --ds-type-mono-family: var(--ds-font-mono);
+  --ds-type-mono-size: 13px;
+  --ds-type-mono-weight: 400;
+  --ds-type-mono-lh: 1.5;
+  --ds-type-mono-ls: 0;
+
+
+  /* ==========================================================
+     COMPONENT TOKENS
+     ========================================================== */
+
+  /* Buttons */
+
+  --ds-btn-primary-bg: var(--ds-primary);
+  --ds-btn-primary-text: var(--ds-on-primary);
+  --ds-btn-primary-radius: var(--ds-rounded-md);
+  --ds-btn-primary-padding: 8px 14px;
+  --ds-btn-primary-hover-bg: var(--ds-primary-hover);
+  --ds-btn-primary-focus-bg: var(--ds-primary-focus);
+
+  --ds-btn-secondary-bg: var(--ds-surface-1);
+  --ds-btn-secondary-text: var(--ds-ink);
+  --ds-btn-secondary-radius: var(--ds-rounded-md);
+  --ds-btn-secondary-padding: 8px 14px;
+
+  --ds-btn-tertiary-bg: var(--ds-canvas);
+  --ds-btn-tertiary-text: var(--ds-ink);
+  --ds-btn-tertiary-radius: var(--ds-rounded-md);
+  --ds-btn-tertiary-padding: 8px 14px;
+
+  --ds-btn-inverse-bg: var(--ds-inverse-canvas);
+  --ds-btn-inverse-text: var(--ds-inverse-ink);
+  --ds-btn-inverse-radius: var(--ds-rounded-md);
+  --ds-btn-inverse-padding: 8px 14px;
+
+  /* Cards */
+
+  --ds-pricing-card-bg: var(--ds-surface-1);
+  --ds-pricing-card-radius: var(--ds-rounded-lg);
+  --ds-pricing-card-padding: 24px;
+  --ds-pricing-card-featured-bg: var(--ds-surface-2);
+
+  --ds-feature-card-bg: var(--ds-surface-1);
+  --ds-feature-card-radius: var(--ds-rounded-lg);
+  --ds-feature-card-padding: 24px;
+
+  --ds-screenshot-card-bg: var(--ds-surface-1);
+  --ds-screenshot-card-radius: var(--ds-rounded-xl);
+  --ds-screenshot-card-padding: 24px;
+
+  --ds-testimonial-card-bg: var(--ds-surface-1);
+  --ds-testimonial-card-radius: var(--ds-rounded-lg);
+  --ds-testimonial-card-padding: 32px;
+
+  /* Logo tile */
+
+  --ds-logo-tile-bg: var(--ds-canvas);
+  --ds-logo-tile-text: var(--ds-ink-subtle);
+  --ds-logo-tile-radius: var(--ds-rounded-xs);
+  --ds-logo-tile-padding: 16px;
+
+  /* Input */
+
+  --ds-input-bg: var(--ds-surface-1);
+  --ds-input-text: var(--ds-ink);
+  --ds-input-radius: var(--ds-rounded-md);
+  --ds-input-padding: 8px 12px;
+
+  /* Pricing tabs */
+
+  --ds-pricing-tab-radius: var(--ds-rounded-pill);
+  --ds-pricing-tab-padding: 6px 14px;
+  --ds-pricing-tab-default-bg: var(--ds-canvas);
+  --ds-pricing-tab-default-text: var(--ds-ink-subtle);
+  --ds-pricing-tab-selected-bg: var(--ds-surface-2);
+  --ds-pricing-tab-selected-text: var(--ds-ink);
+
+  /* CTA */
+
+  --ds-cta-banner-bg: var(--ds-surface-1);
+  --ds-cta-banner-text: var(--ds-ink);
+  --ds-cta-banner-radius: var(--ds-rounded-lg);
+  --ds-cta-banner-padding: 48px;
+
+  /* Changelog */
+
+  --ds-changelog-row-bg: var(--ds-canvas);
+  --ds-changelog-row-text: var(--ds-ink);
+  --ds-changelog-row-radius: var(--ds-rounded-xs);
+  --ds-changelog-row-padding: 24px 0;
+
+  /* Status badge */
+
+  --ds-status-badge-bg: var(--ds-surface-2);
+  --ds-status-badge-text: var(--ds-ink-muted);
+  --ds-status-badge-radius: var(--ds-rounded-pill);
+  --ds-status-badge-padding: 2px 8px;
+
+  /* Navigation */
+
+  --ds-top-nav-bg: var(--ds-canvas);
+  --ds-top-nav-text: var(--ds-ink);
+  --ds-top-nav-height: 56px;
+
+  /* Footer */
+
+  --ds-footer-bg: var(--ds-canvas);
+  --ds-footer-text: var(--ds-ink-subtle);
+  --ds-footer-padding: 64px 32px;
+}
+
+
+/* ============================================================
+   DARK THEME
+   AEGIS / LINEAR-STYLE DARK UI
+   ============================================================ */
+
+.dark {
+  /* ── COSS semantic colors ────────────────────────────────── */
+
+  --background: #010102;
+  --foreground: #f7f8f8;
+
+  --card: #0f1011;
+  --card-foreground: #f7f8f8;
+
+  --popover: #0f1011;
+  --popover-foreground: #f7f8f8;
+
+  --primary: #5e6ad2;
+  --primary-foreground: #ffffff;
+
+  --secondary: #141516;
+  --secondary-foreground: #f7f8f8;
+
+  --muted: #141516;
+  --muted-foreground: #8a8f98;
+
+  --accent: #18191a;
+  --accent-foreground: #f7f8f8;
+
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
+
+  --success: #27a644;
+  --success-foreground: #ffffff;
+
+  --warning: #f59e0b;
+  --warning-foreground: #ffffff;
+
+  --info: #3b82f6;
+  --info-foreground: #ffffff;
+
+  --border: #23252a;
+  --input: #23252a;
+  --ring: #5e6ad2;
+
+  /* ── Charts ───────────────────────────────────────────────── */
+
+  --chart-1: #5e6ad2;
+  --chart-2: #27a644;
+  --chart-3: #3b82f6;
+  --chart-4: #f59e0b;
+  --chart-5: #ef4444;
+
+  /* ── Sidebar ──────────────────────────────────────────────── */
+
+  --sidebar: #0f1011;
+  --sidebar-foreground: #f7f8f8;
+  --sidebar-primary: #5e6ad2;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #18191a;
+  --sidebar-accent-foreground: #f7f8f8;
+  --sidebar-border: #23252a;
+  --sidebar-ring: #5e6ad2;
+
+
+  /* ==========================================================
+     AEGIS DARK OVERRIDES
+     ========================================================== */
+
+  --ds-ink: #f7f8f8;
+  --ds-ink-muted: #d0d6e0;
+  --ds-ink-subtle: #8a8f98;
+  --ds-ink-tertiary: #62666d;
+
+  --ds-canvas: #010102;
+  --ds-surface-1: #0f1011;
+  --ds-surface-2: #141516;
+  --ds-surface-3: #18191a;
+  --ds-surface-4: #191a1b;
+
+  --ds-hairline: #23252a;
+  --ds-hairline-strong: #34343a;
+  --ds-hairline-tertiary: #3e3e44;
+
+  --ds-inverse-canvas: #ffffff;
+  --ds-inverse-surface-1: #f5f6f6;
+  --ds-inverse-surface-2: #f6f7f7;
+  --ds-inverse-ink: #000000;
+}
+
+
+/* ============================================================
+   BASE
+   ============================================================ */
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  html {
+    @apply font-sans;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+
+    font-family: var(--font-text);
+    font-feature-settings:
+      "rlig" 1,
+      "calt" 1;
+  }
+
+  button,
+  input,
+  textarea,
+  select {
+    font: inherit;
+  }
+
+  ::selection {
+    background: color-mix(in oklch, var(--primary) 25%, transparent);
+    color: var(--foreground);
+  }
+}
+
+
+/* ============================================================
+   AEGIS TYPOGRAPHY UTILITIES
+   ============================================================ */
+
+.text-display-xl {
+  font-family: var(--ds-type-display-xl-family);
+  font-size: var(--ds-type-display-xl-size);
+  font-weight: var(--ds-type-display-xl-weight);
+  line-height: var(--ds-type-display-xl-lh);
+  letter-spacing: var(--ds-type-display-xl-ls);
+}
+
+.text-display-lg {
+  font-family: var(--ds-type-display-lg-family);
+  font-size: var(--ds-type-display-lg-size);
+  font-weight: var(--ds-type-display-lg-weight);
+  line-height: var(--ds-type-display-lg-lh);
+  letter-spacing: var(--ds-type-display-lg-ls);
+}
+
+.text-display-md {
+  font-family: var(--ds-type-display-md-family);
+  font-size: var(--ds-type-display-md-size);
+  font-weight: var(--ds-type-display-md-weight);
+  line-height: var(--ds-type-display-md-lh);
+  letter-spacing: var(--ds-type-display-md-ls);
+}
+
+.text-headline {
+  font-family: var(--ds-type-headline-family);
+  font-size: var(--ds-type-headline-size);
+  font-weight: var(--ds-type-headline-weight);
+  line-height: var(--ds-type-headline-lh);
+  letter-spacing: var(--ds-type-headline-ls);
+}
+
+.text-card-title {
+  font-family: var(--ds-type-card-title-family);
+  font-size: var(--ds-type-card-title-size);
+  font-weight: var(--ds-type-card-title-weight);
+  line-height: var(--ds-type-card-title-lh);
+  letter-spacing: var(--ds-type-card-title-ls);
+}
+
+.text-subhead {
+  font-family: var(--ds-type-subhead-family);
+  font-size: var(--ds-type-subhead-size);
+  font-weight: var(--ds-type-subhead-weight);
+  line-height: var(--ds-type-subhead-lh);
+  letter-spacing: var(--ds-type-subhead-ls);
+}
+
+.text-body-lg {
+  font-family: var(--ds-type-body-lg-family);
+  font-size: var(--ds-type-body-lg-size);
+  font-weight: var(--ds-type-body-lg-weight);
+  line-height: var(--ds-type-body-lg-lh);
+  letter-spacing: var(--ds-type-body-lg-ls);
+}
+
+.text-body {
+  font-family: var(--ds-type-body-family);
+  font-size: var(--ds-type-body-size);
+  font-weight: var(--ds-type-body-weight);
+  line-height: var(--ds-type-body-lh);
+  letter-spacing: var(--ds-type-body-ls);
+}
+
+.text-body-sm {
+  font-family: var(--ds-type-body-sm-family);
+  font-size: var(--ds-type-body-sm-size);
+  font-weight: var(--ds-type-body-sm-weight);
+  line-height: var(--ds-type-body-sm-lh);
+  letter-spacing: var(--ds-type-body-sm-ls);
+}
+
+.text-caption {
+  font-family: var(--ds-type-caption-family);
+  font-size: var(--ds-type-caption-size);
+  font-weight: var(--ds-type-caption-weight);
+  line-height: var(--ds-type-caption-lh);
+  letter-spacing: var(--ds-type-caption-ls);
+}
+
+.text-button {
+  font-family: var(--ds-type-button-family);
+  font-size: var(--ds-type-button-size);
+  font-weight: var(--ds-type-button-weight);
+  line-height: var(--ds-type-button-lh);
+  letter-spacing: var(--ds-type-button-ls);
+}
+
+.text-eyebrow {
+  font-family: var(--ds-type-eyebrow-family);
+  font-size: var(--ds-type-eyebrow-size);
+  font-weight: var(--ds-type-eyebrow-weight);
+  line-height: var(--ds-type-eyebrow-lh);
+  letter-spacing: var(--ds-type-eyebrow-ls);
+}
+
+.text-mono {
+  font-family: var(--ds-type-mono-family);
+  font-size: var(--ds-type-mono-size);
+  font-weight: var(--ds-type-mono-weight);
+  line-height: var(--ds-type-mono-lh);
+  letter-spacing: var(--ds-type-mono-ls);
+}
+
+
+/* ============================================================
+   RESPONSIVE TYPOGRAPHY
+   ============================================================ */
+
+@media (max-width: 1024px) {
+  .text-display-xl {
+    font-size: 64px;
+    letter-spacing: -2.4px;
+  }
+
+  .text-display-lg {
+    font-size: 48px;
+    letter-spacing: -1.5px;
+  }
+
+  .text-display-md {
+    font-size: 36px;
+  }
+}
+
+@media (max-width: 640px) {
+  .text-display-xl {
+    font-size: 48px;
+    letter-spacing: -1.8px;
+  }
+
+  .text-display-lg {
+    font-size: 40px;
+    letter-spacing: -1.2px;
+  }
+
+  .text-display-md {
+    font-size: 32px;
+    letter-spacing: -0.8px;
+  }
+
+  .text-headline {
+    font-size: 24px;
+  }
+
+  .text-card-title {
+    font-size: 20px;
+  }
+}
