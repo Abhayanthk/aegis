@@ -1,0 +1,16 @@
+{
+  "name": "aegis-runtime-reliability-scripts",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Deterministic measurement and verification scripts for the AEGIS runtime-reliability skill.",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "experiment": "node run_experiment.mjs",
+    "verify": "node verify.mjs"
+  },
+  "dependencies": {
+    "autocannon": "^7.15.0"
+  }
+}
