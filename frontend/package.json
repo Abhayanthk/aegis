@@ -10,6 +10,8 @@
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",
+    "@clerk/nextjs": "^7.8.3",
+    "@clerk/ui": "^1.31.0",
     "@daypicker/react": "^10.0.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

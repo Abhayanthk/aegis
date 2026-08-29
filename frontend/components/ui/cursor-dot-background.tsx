@@ -8,7 +8,7 @@ export function CursorDotBackground() {
   // Mutable refs for tracking cursor state without React re-renders
   const mouse = useRef({ x: -1000, y: -1000 });
   const interpolatedMouse = useRef({ x: -1000, y: -1000 });
-  const animationFrameId = useRef<number>();
+  const animationFrameId = useRef<number | undefined>(undefined);
 
   useEffect(() => {
     const canvas = canvasRef.current;

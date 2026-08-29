@@ -26,7 +26,7 @@ export default function ProjectsPage() {
         </div>
 
         <div className="flex items-center gap-3">
-          <select className="h-8 rounded border-0 bg-transparent px-2 text-[13px] font-medium text-[var(--ds-ink-subtle)] outline-none hover:text-[var(--ds-ink)] cursor-pointer appearance-none">
+          <select className="h-8 rounded-lg border border-[var(--ds-hairline)] bg-[var(--ds-surface-1)]/50 dark:bg-input/32 hover:bg-[var(--ds-surface-1)] px-2.5 text-[13px] font-medium text-[var(--ds-ink-subtle)] outline-none hover:text-[var(--ds-ink)] cursor-pointer appearance-none transition-colors">
             {projectData.filters.map(f => (
               <option key={f.value} value={f.value}>{f.label}</option>
             ))}
