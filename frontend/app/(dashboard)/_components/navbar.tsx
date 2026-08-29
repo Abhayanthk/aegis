@@ -15,6 +15,7 @@ import {
   Zap,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { SignInButton, SignUpButton, Show, UserButton } from "@clerk/nextjs";
 
 const toolbarActions = [
   { icon: Pencil, label: "Edit" },
@@ -126,6 +127,38 @@ export function Navbar() {
           <Plus className="h-3 w-3 mr-1" />
           New
         </Button>
+
+        <div className="mx-1 h-4 w-px bg-[var(--ds-hairline)]" />
+
+        <Show when="signed-out">
+          <SignInButton mode="modal">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 px-2.5 text-[12px] font-medium text-[var(--ds-ink-subtle)] hover:bg-[var(--ds-surface-3)] hover:text-[var(--ds-ink)]"
+            >
+              Sign In
+            </Button>
+          </SignInButton>
+          <SignUpButton mode="modal">
+            <Button
+              size="sm"
+              className="h-7 px-3 text-[12px] font-medium bg-[var(--ds-primary)] text-[var(--ds-on-primary)] hover:bg-[var(--ds-primary-hover)]"
+            >
+              Sign Up
+            </Button>
+          </SignUpButton>
+        </Show>
+
+        <Show when="signed-in">
+          <UserButton
+            appearance={{
+              elements: {
+                userButtonAvatarBox: "h-7 w-7",
+              },
+            }}
+          />
+        </Show>
       </div>
     </header>
     </div>
