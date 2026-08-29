@@ -1,4 +1,5 @@
 import { ProjectGrid } from "../_components/projects/project-grid";
+import Link from "next/link";
 import { Search, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,13 +32,15 @@ export default function ProjectsPage() {
             ))}
           </select>
 
-          <Button
-            size="sm"
-            className="h-8 px-3 text-[12px] font-medium bg-[var(--ds-primary)] text-[var(--ds-on-primary)] hover:bg-[var(--ds-primary-hover)] border-0 gap-1.5 shrink-0"
-          >
-            <Plus className="h-3.5 w-3.5" />
-            Add project
-          </Button>
+          <Link href="/projects/new">
+            <Button
+              size="sm"
+              className="h-8 px-3 text-[12px] font-medium bg-[var(--ds-primary)] text-[var(--ds-on-primary)] hover:bg-[var(--ds-primary-hover)] border-0 gap-1.5 shrink-0"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Add project
+            </Button>
+          </Link>
         </div>
       </div>
 
