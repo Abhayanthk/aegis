@@ -73,10 +73,14 @@ ANALYZE ──→ Read repo, identify suspect code paths
  │
  ▼
 REPRODUCE ──→ Run baseline experiment (scripts/run_experiment.mjs)
- │            MUST succeed (exit 0) before proceeding
- │            If exit != 0: fix config and retry, do NOT guess metrics
+│            MUST succeed (exit 0) before proceeding
+│            If exit != 0: fix config and retry, do NOT guess metrics
  ▼
-DIAGNOSE ──→ Interpret baseline metrics to identify root cause
+BASELINE REVIEW ──→ Present baseline evidence and ask for approval to repair
+ │                  Wait for an explicit human "proceed" before editing code
+ │                  If declined: stop and retain the baseline evidence
+ ▼
+DIAGNOSE ──→ Interpret approved baseline metrics to identify root cause
  │            Read the JSON output — never fabricate numbers
  ▼
 REPAIR ──→ Delegate to Performance Repairer (max 3 attempts)
@@ -95,6 +99,22 @@ APPROVE ──→ Present verdict + evidence to human for approval
 PR ──→ Commit changes and open a pull request
        automatic_merge = false
 ```
+
+### Baseline approval gate
+
+After a successful baseline and before any code edit, report the harness values
+that establish the baseline: event-loop p99, health success rate and p99,
+target p99, target error count, and functional-test result. Then ask exactly
+what action to take, for example:
+
+> Baseline captured: event-loop p99 is `<value> ms`; health is `<success>%`
+> successful with p99 `<value> ms`; target p99 is `<value> ms`; functional
+> tests are `<passed>` passed and `<failed>` failed. Should I proceed with the
+> smallest repair and run the candidate verification?
+
+Do not diagnose in detail, delegate the Repairer, edit target code, or run a
+candidate experiment until the human explicitly approves. This approval permits
+the repair-and-verification loop only; GitHub writes still need separate approval.
 
 ---
 
@@ -210,6 +230,10 @@ node scripts/verify.mjs --baseline <baseline/metrics.json> \
 13. **No unverified completion claim.** State `VERIFIED` only after the
     candidate metrics and verdict JSON both exist. Report raw values, not
     informal benchmark summaries, to the user.
+
+14. **Baseline approval is mandatory.** A successful baseline is evidence, not
+    authorization to edit. Wait for explicit approval before entering
+    DIAGNOSE or REPAIR.
 
 ---
 
