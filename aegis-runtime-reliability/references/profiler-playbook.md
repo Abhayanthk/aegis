@@ -39,17 +39,25 @@ Using the Repository Analyst's findings, create an experiment config JSON:
 - `duration_seconds` should be long enough for stable measurements (default: 20s).
 - Use a `request_payload` that triggers the suspect code path.
 
-### 2. Install Dependencies
+### 2. Prepare Dependencies Once
 
-The Daytona sandbox may not have Node.js or `npm` pre-installed. Before running experiments, verify the environment and install dependencies:
+Run one environment check (`node --version` and `npm --version`) before the
+first experiment. If Node is available, do not install or upgrade it. Install
+the AEGIS harness dependencies once from the `scripts/` directory:
 
 ```bash
-# 1. Install Node.js and npm if missing
-apt-get update && apt-get install -y nodejs npm
+# When scripts/package-lock.json exists
+cd scripts && npm ci
 
-# 2. Install Aegis script dependencies
+# Otherwise
 cd scripts && npm install
 ```
+
+Do not install `autocannon` globally: the harness imports its local dependency.
+
+If Node is absent or the harness dependency install fails, report the exact
+environment error to the root agent. Do not spend the experiment phase trying
+multiple operating-system package managers.
 
 ### 3. Run the Baseline Experiment
 
@@ -61,6 +69,11 @@ node scripts/run_experiment.mjs --config experiment-config.json --output baselin
 - **Exit 0**: Baseline captured successfully. Read `baseline/metrics.json`.
 - **Exit non-zero**: Experiment failed. Read stderr for the error.
   **DO NOT proceed without a successful baseline.** Fix the config and retry.
+
+The command in `start_command` is run by `run_experiment.mjs`. Never start the
+server manually with `&`, `nohup`, redirection, or `timeout`, and never run raw
+`autocannon` as a substitute. The harness waits for health readiness and kills
+the target process group after the experiment.
 
 ### 4. After Repair — Run the Candidate Experiment
 
@@ -113,8 +126,13 @@ Return the raw outputs to the root agent:
 4. **One experiment at a time.** Don't run baseline and candidate
    simultaneously — they'd interfere with each other's measurements.
 
-5. **Check for port conflicts.** If the target app fails to start, it's
-   likely a port conflict from a previous run. Kill stale processes first.
+5. **Check reported port conflicts only.** If the target app fails to start,
+   read the harness stderr first. Inspect a specific port only when that error
+   is present; do not pre-emptively install process tools or kill processes.
 
 6. **Respect the sandbox.** All execution happens in the Daytona sandbox.
    Never run experiments on the host machine.
+
+7. **Keep setup bounded.** Reuse the same installed harness dependencies and
+   config for baseline and candidate. After two setup failures, return the raw
+   errors for escalation rather than guessing at more commands.
