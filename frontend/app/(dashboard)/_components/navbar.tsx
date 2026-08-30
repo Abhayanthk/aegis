@@ -138,19 +138,19 @@ export function Navbar() {
           {controls.isPaused ? (
             <Button
               onClick={controls.onResume}
-              variant="ghost"
+              variant="outline"
               size="sm"
-              className="h-7 gap-1.5 px-2.5 text-[12px] font-medium text-[var(--ds-ink-subtle)] hover:bg-[var(--ds-surface-3)] hover:text-[var(--ds-ink)]"
+              className="h-7 gap-1.5 px-2.5 text-[12px] font-medium border border-[var(--ds-hairline)] bg-[var(--ds-surface-2)] text-[var(--ds-ink-subtle)] hover:!bg-white hover:!text-black hover:!border-white dark:hover:!bg-white dark:hover:!text-black dark:hover:!border-white [&:hover_*]:!text-black transition-colors shadow-xs"
             >
-              <Play className="h-3 w-3" />
+              <Play className="h-3 w-3 text-emerald-500" />
               Resume
             </Button>
           ) : (
             <Button
               onClick={controls.onPause}
-              variant="ghost"
+              variant="outline"
               size="sm"
-              className="h-7 gap-1.5 px-2.5 text-[12px] font-medium text-[var(--ds-ink-subtle)] hover:bg-[var(--ds-surface-3)] hover:text-[var(--ds-ink)]"
+              className="h-7 gap-1.5 px-2.5 text-[12px] font-medium border border-[var(--ds-hairline)] bg-[var(--ds-surface-2)] text-[var(--ds-ink-subtle)] hover:!bg-white hover:!text-black hover:!border-white dark:hover:!bg-white dark:hover:!text-black dark:hover:!border-white [&:hover_*]:!text-black transition-colors shadow-xs"
             >
               <Pause className="h-3 w-3" />
               Pause
@@ -158,9 +158,9 @@ export function Navbar() {
           )}
           <Button
             onClick={controls.onRequestCancel}
-            variant="ghost"
+            variant="outline"
             size="sm"
-            className="h-7 gap-1.5 px-2.5 text-[12px] font-medium text-[var(--ds-ink-subtle)] hover:bg-red-500/10 hover:text-red-500"
+            className="h-7 gap-1.5 px-2.5 text-[12px] font-medium border border-red-500/40 bg-red-500/10 text-red-400 dark:bg-red-500/10 dark:text-red-400 dark:border-red-500/40 hover:!bg-red-600 hover:!text-white hover:!border-red-600 dark:hover:!bg-red-600 dark:hover:!text-white dark:hover:!border-red-600 [&:hover_*]:!text-white transition-colors shadow-xs"
           >
             <X className="h-3 w-3" />
             Cancel
