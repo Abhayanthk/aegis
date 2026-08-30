@@ -167,19 +167,25 @@ export function useTrueForgeAgent(apiUrl: string = "http://localhost:3001/api/ch
 
   const pauseAgent = useCallback(async () => {
     if (!sessionId) return;
-    
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-    }
-    
-    setAgentState("PAUSED");
 
     try {
-      await fetch(`${apiUrl}/${sessionId}/cancel`, {
+      const response = await fetch(`${apiUrl}/${sessionId}/cancel`, {
         method: "POST",
       });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || errorData.error || `HTTP ${response.status}`);
+      }
+      
+      // Only transition to PAUSED and abort stream on success
+      setAgentState("PAUSED");
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
     } catch (err: any) {
       console.error("Failed to pause on backend", err);
+      setError(`Cancellation failed: ${err.message}`);
     }
   }, [apiUrl, sessionId]);
 
