@@ -30,8 +30,8 @@ act on it.
 ```
 Root Agent (you)
 ├── Repository Analyst — static analysis and experiment inputs
-├── Runtime Profiler — harness configuration and raw measurements
-└── Performance Repairer — the smallest evidence-backed code change
+├── Runtime Profiler — harness configuration, experiment config, and raw measurements
+└── Performance Repairer — evidence-backed code changes
 ```
 
 ### Delegation is an execution requirement
@@ -87,8 +87,10 @@ outside the sandbox. Never put secrets in the sandbox.
    install target and harness dependencies once using their lockfiles. Never
    ask the user to approve this sandbox-only setup. If setup fails, report the
    exact error and stop because a baseline cannot be produced.
-4. Wait for the Analyst's structured report, then select the target endpoint,
-   health endpoint, payload, package manager, and real functional command.
+4. Wait for the Analyst's structured report, then the Profiler creates the
+   experiment config using the Analyst's endpoint details. The **Profiler owns
+   the experiment config**; config schema and load profile defaults are in
+   `references/profiler-playbook.md`.
 5. Run one baseline. Only after the baseline succeeds, present the required
    evidence and wait for explicit human approval before any target-code edit.
 
@@ -168,14 +170,6 @@ values side by side with the verifier's raw verdict. Ask whether to create the
 branch, commit, and pull request. Do not make GitHub writes before approval.
 This is the third and final user decision.
 
-### User interaction policy
-
-Ask for a user decision at exactly these three workflow checkpoints:
-
-1. baseline captured: continue to diagnosis;
-2. repair proposal ready: apply the proposed code change; and
-3. candidate verified (or partially improved): loop for more fixes or create the pull request.
-
 Do not ask for approval to provision the isolated sandbox, install project or
 harness dependencies, choose a smoke check, or retry a bounded setup step. On a
 blocking setup or measurement failure, report the exact error and stop without
@@ -197,6 +191,9 @@ playbook before delegating that role. Do not load all playbooks into every role.
 Evidence and verification contracts are in:
 - `references/evidence-contract.md`
 - `references/verification-contract.md`
+
+Verification thresholds are in `config/verification-policy.json`. Do not
+hard-code thresholds in prompts; the verifier reads them at runtime.
 
 ### Required prompt shape
 
@@ -300,14 +297,14 @@ node scripts/verify.mjs --baseline <baseline/metrics.json> \
 
 ## Guardrails (NON-NEGOTIABLE)
 
-1. **Reproduction is mandatory.** Never diagnose from static reading alone.
-   You must have a successful baseline experiment before attempting repair.
-
-2. **Verifier owns the verdict.** Never override, reinterpret, or skip
+1. **Verifier owns the verdict.** Never override, reinterpret, or skip
    `verify.mjs`. If it says FAILED, the candidate failed — period.
 
-3. **Never fabricate a measurement.** If `run_experiment.mjs` crashes,
+2. **Never fabricate a measurement.** If `run_experiment.mjs` crashes,
    fix the config and re-run. Do not invent metrics.
+
+3. **Sandbox only.** Execute repository code only in the Daytona sandbox.
+   Never run it on the host. Never put secrets in the sandbox.
 
 4. **Functional regression fails the candidate.** Even if latency improved
    dramatically, a single functional test failure means the candidate is
@@ -316,120 +313,22 @@ node scripts/verify.mjs --baseline <baseline/metrics.json> \
 5. **Max 3 repair attempts, then escalate.** After 3 failed attempts,
    stop and present all evidence to the human. Do not keep trying.
 
-6. **Sandbox only.** Execute repository code only in the Daytona sandbox.
-   Never run it on the host. Never put secrets in the sandbox.
-
-7. **Separate reads from writes.** Use GitHub read tools freely. Use
-   write tools (branch, commit, PR) only after human approval.
-
-8. **No auto-merge.** `automatic_merge = false` in policy. PRs are
-   opened for human review.
-
-9. **Narrowly scoped changes.** Each repair should touch the minimum
+6. **Narrowly scoped changes.** Each repair should touch the minimum
    code necessary. No drive-by refactors.
 
-10. **Every change is evidence-backed.** Every claim must cite the
-    specific metrics from the experiment output.
+7. **Every change is evidence-backed.** Every claim must cite the
+   specific metrics from the experiment output.
 
-11. **Minimize exploratory tool use.** Batch independent reads, use `rg` to
-    locate code and package metadata, and inspect the exact files returned.
-    Do not repeatedly re-read files, re-install dependencies, or probe the same
-    endpoint manually after the harness has produced evidence.
+8. **Minimize exploratory tool use.** Batch independent reads, use `rg` to
+   locate code and package metadata, and inspect the exact files returned.
+   Do not repeatedly re-read files, re-install dependencies, or probe the same
+   endpoint manually after the harness has produced evidence.
 
-12. **One bounded diagnosis loop.** Build the config once from the Analyst's
-    report; on a harness failure, make one config/environment correction per
-    retry and report the concrete error. After two setup failures, escalate
-    rather than cycling through guesses.
+9. **One bounded diagnosis loop.** Build the config once from the Analyst's
+   report; on a harness failure, make one config/environment correction per
+   retry and report the concrete error. After two setup failures, escalate
+   rather than cycling through guesses.
 
-13. **No unverified completion claim.** State `VERIFIED` only after the
+10. **No unverified completion claim.** State `VERIFIED` only after the
     candidate metrics and verdict JSON both exist. Report raw values, not
     informal benchmark summaries, to the user.
-
-14. **Three user decisions only.** Ask only after baseline capture, after an
-    evidence-backed repair proposal, and after a VERIFIED comparison before a
-    pull request. Setup, dependency installation, smoke-test selection, and
-    bounded retries are automatic sandbox operations.
-
-15. **No fake functional pass.** `functional_test_command` must execute the
-    repository's real test suite or the harness's meaningful health smoke
-    check. Never use `exit 0`, `true`, `:`, an empty command, or output-only
-    commands. When no suite exists, omit `functional_test_command`; the harness
-    automatically probes the Analyst-reported health endpoint and fails on a
-    non-2xx response. Do not ask the user to choose this fallback.
-
-16. **Sandbox setup is automatic and contained.** Provision Node >=18 with the
-    sandbox-supported mechanism (use `nvm` when available), and install only
-    lockfile-respecting target and local harness dependencies. Never use `sudo`,
-    modify the host, or install global packages. A setup failure is reported as
-    a blocker, not presented as a user choice.
-
----
-
-## Load profile — concrete defaults (configurable inputs, IDENTICAL for baseline and candidate)
-
-The Runtime Profiler supplies these; document these defaults in run_experiment.mjs:
-- Autocannon: connections (virtual users) = 50, duration = 20s, pipelining = 1
-- Warmup: 3s before measurement starts
-- Independent health probe: one GET to the Analyst-reported health endpoint
-  (normally `/health`) every 500ms for the full duration
-- Event-loop sampling resolution: 20ms
-
-These are INPUTS, not hard-coded constants — but baseline and candidate MUST use
-the exact same values. That identity is precisely what protocol_hash captures. If
-a target needs heavier load to starve, raise connections; NEVER change the numbers
-between baseline and candidate, or the comparison is invalid.
-
-Create an experiment config JSON matching this schema before running:
-
-```json
-{
-  "start_command": "node server.js",
-  "target_endpoint": "http://localhost:3000/api/heavy-computation",
-  "request_method": "POST",
-  "request_payload": { "size": 10000 },
-  "duration_seconds": 20,
-  "connections": 50,
-  "rate": 0,
-  "pipelining": 1,
-  "health_probe_path": "http://localhost:3000/health",
-  "health_probe_interval_ms": 500,
-  "functional_test_command": "node --test test/",
-  "warmup_seconds": 3,
-  "startup_timeout_ms": 30000,
-  "event_loop_resolution_ms": 20
-}
-```
-
-Use the SAME config file for both baseline and candidate runs.
-
-Select `target_endpoint` from the Analyst's highest-confidence, externally
-reachable suspect. Prefer a read-only endpoint when it exercises the failure;
-otherwise use the smallest payload that reliably triggers the suspect path.
-Set `health_probe_path` to the independent lightweight endpoint reported by the
-Analyst, not a guessed `/healthz` route. Set `functional_test_command` to the
-reported real test command. If the repository has no suite, omit
-`functional_test_command`; the harness runs the documented health smoke check
-against the Analyst-reported endpoint. A no-op command is invalid and the
-harness rejects it.
-
-For a nested target repository, keep the process foregrounded in the config,
-for example: `"start_command": "cd nodetest && node src/server.js"`. The
-harness invokes that command and cleans it up; do not execute this command
-yourself first.
-
----
-
-## Quick Reference: Verification Policy
-
-Thresholds are in `config/verification-policy.json` (configurable, not
-hard-coded). Current defaults:
-
-| Gate               | Condition                           | Threshold |
-|--------------------|-------------------------------------|-----------|
-| event_loop_p99     | candidate.p99 / baseline.p99        | ≤ 0.25    |
-| health_success     | success_rate during load             | ≥ 0.99    |
-| health_p99         | health probe p99 response time       | ≤ 100 ms  |
-| target_p99         | candidate.p99 / baseline.p99        | ≤ 0.50    |
-| target_error_rate  | errors / total requests              | ≤ 0.01    |
-| functional_pass    | pass_rate                            | = 1.0     |
-| functional_zero_fail | failed count                       | = 0       |
