@@ -126,10 +126,6 @@ REVIEW ──→ Present all findings to the user (Root Agent)
            Ask the user exactly: "Do you want to raise a PR, retry the repair, or reject?"
 ```
 
-### UI & Frontend Integration (Hackathon Guidelines)
-When running in a TrueFoundry / Antigravity UI environment, the Root Agent must present the structured data (Analyst JSON, Baseline metrics, Code Diff, Candidate metrics) to the frontend user.
-To do this, the Root Agent should format these outputs cleanly in its chat response or write them to user-facing Markdown Artifacts so the frontend can render them properly.
-
 Do not halt the autonomous pipeline (`ANALYZE` -> `BASELINE` -> `REPAIR` -> `CANDIDATE`) for any mid-step user confirmations. The pipeline must run head-to-tail and only present the final combined report and `REVIEW` decision to the user.
 
 ---
