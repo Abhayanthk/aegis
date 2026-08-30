@@ -90,6 +90,21 @@ tree above.
 
 ---
 
+## What You Report
+
+Return your findings as structured JSON to the root agent:
+
+```json
+{
+  "files_changed": ["<relative path to each edited file>"],
+  "diff_summary": "<human-readable summary of what you changed and why>",
+  "strategy_used": "<worker_threads|cooperative_chunking|algorithmic_fix|caching|async_conversion|deletion>",
+  "affected_tests": "<test command or null>"
+}
+```
+
+---
+
 ## After Editing: What Happens Next
 
 1. You make code edits to the target repository.

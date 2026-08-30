@@ -277,7 +277,7 @@ Baseline Metrics: <INSERT RAW JSON OR ABSOLUTE PATH TO baseline/metrics.json>
 Verification Verdict (if this is a retry): <INSERT RAW JSON OR ABSOLUTE PATH TO verdict.json>
 
 You may edit only the target repository files needed for the supplied evidence-backed suspect. Return
-the minimal diff summary and affected tests; do not run or claim a verification
+the required JSON output summarizing your changes; do not run or claim a verification
 verdict. If the playbook cannot be read, stop and report that blocker.
 ```
 
