@@ -122,8 +122,17 @@ Report the full verdict JSON back to the root agent.
 
 ## What You Report
 
-Return the raw outputs to the root agent:
+Return the raw outputs to the root agent. The exact fields required depend on your phase:
 
+**For `preparation` phase:**
+```json
+{
+  "phase": "preparation",
+  "exit_code": 0
+}
+```
+
+**For `baseline`, `candidate`, or `verification` phase:**
 ```json
 {
   "phase": "baseline|candidate|verification",
@@ -131,9 +140,9 @@ Return the raw outputs to the root agent:
   "functional_evidence_type": "test_suite|repo_smoke",
   "metrics_path": "<absolute path to written metrics.json>",
   "config_path": "<absolute path to experiment-config.json>",
-  "verdict_path": "<absolute path to verdict.json, if verification phase>",
+  "verdict_path": "<absolute path to verdict.json, if verification phase, else null>",
   "metrics": { "...raw metrics.json contents..." },
-  "verdict": { "...raw verdict.json contents if verification phase..." }
+  "verdict": { "...raw verdict.json contents if verification phase, else null..." }
 }
 ```
 

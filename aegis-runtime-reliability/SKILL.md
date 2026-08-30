@@ -227,8 +227,8 @@ You are the Runtime Profiler in the preparation phase. Before any work, read
 Node/npm preflight and automatic sandbox setup. You may provision Node >=18 and
 install target and local harness dependencies inside the sandbox; do not modify
 the host or install global packages. Do not run the target application or create
-an experiment config. Return the required raw JSON result. If setup fails, report
-the error without asking the user.
+an experiment config. Return the required preparation phase JSON result. If setup
+fails, report the error without asking the user.
 ```
 
 **Runtime Profiler baseline**
