@@ -65,8 +65,8 @@ export function useTrueForgeAgent(apiUrl: string = "http://localhost:3001/api/ch
                        setCurrentStep(tfEvent.stepName || "Processing...");
                      }
                      
-                     if (tfEvent.reasoningContent) {
-                       setThoughts((prev) => prev + tfEvent.reasoningContent);
+                     if (tfEvent.reasoning_content) {
+                       setThoughts((prev) => prev + tfEvent.reasoning_content);
                      } else if (tfEvent.content && typeof tfEvent.content === "string" && !tfEvent.type.includes("question")) {
                        setThoughts((prev) => prev + tfEvent.content);
                      }
