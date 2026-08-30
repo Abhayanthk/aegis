@@ -106,73 +106,50 @@ Every engagement follows this sequence. Do NOT skip steps.
 IDLE
  │
  ▼
-ANALYZE ──→ Read repo, identify suspect code paths
- │
+ANALYZE ──→ Delegate to Repository Analyst
+ │          Read repo, find entry points, and identify suspect bottlenecks.
  ▼
-REPRODUCE ──→ Run baseline experiment (scripts/run_experiment.mjs)
-│            MUST succeed (exit 0) before proceeding
-│            If exit != 0: fix config and retry, do NOT guess metrics
+BASELINE ──→ Delegate to Runtime Profiler (Preparation + Baseline phases)
+ │           Set up sandbox, run load test, and generate baseline metrics.
+ │           MUST succeed (exit 0) before proceeding.
  ▼
-BASELINE REVIEW ──→ Present baseline evidence and ask to continue to diagnosis
- │                  Wait for explicit human approval before diagnosis
- │                  If declined: stop and retain the baseline evidence
- ▼
-DIAGNOSE ──→ Interpret approved baseline metrics to identify root cause
- │            Produce the smallest evidence-backed repair proposal
+DIAGNOSE ──→ Interpret baseline metrics to identify root cause
+ │           Produce the smallest evidence-backed repair proposal
  ▼
 REPAIR REVIEW ──→ Present the proposed code change and ask to apply it
- │                 Wait for explicit human approval before any code edit
+ │                Use the `ask_question` tool to get explicit human approval before any code edit
  ▼
 REPAIR ──→ Delegate to Performance Repairer (max 3 attempts)
- │          Repairer edits code, then Profiler re-runs experiment
- │          verify.mjs compares candidate vs baseline
+ │         Use Analyst output and Baseline metrics to apply the best repair pattern.
+ │         Generate minimal code diff.
+ ▼
+CANDIDATE ──→ Delegate to Runtime Profiler (Candidate phase)
+ │            Re-run the exact same experiment against the edited code.
+ │            verify.mjs compares candidate vs baseline.
  │          │
- │          ├─ VERIFIED → Ask human: "The candidate passed verification. Do you want to try and repair further?"
- │          │             (Yes → loop back to REPAIR, No → proceed to PR REVIEW)
- │          ├─ FAILED   → Ask human: "The candidate failed verification but may have improved. Is this valuation good enough?"
- │          │             (Yes → loop back to REPAIR for more fixes, No → proceed to PR REVIEW)
+ │          ├─ VERIFIED → Proceed to PR REVIEW
+ │          ├─ FAILED   → Loop back to REPAIR (max 3 attempts). If 3 attempts fail, ESCALATE.
  │          ├─ RETRY    → Re-run experiment (transient issue)
  │          ├─ INCOMPARABLE → Fix protocol mismatch, re-run
  │          └─ ESCALATE → Stop, report evidence to human
  ▼
-PR REVIEW ──→ Present baseline/candidate comparison and VERIFIED verdict
- │            Ask approval to create the branch, commit, and pull request
- │            human_approval_required_before_github_write = true
- ▼
-PR ──→ Commit changes and open a pull request
-       automatic_merge = false
+PR REVIEW ──→ Present all findings to the user (Root Agent)
+              Show the Analyst bottlenecks, Baseline metrics, code diff, and Candidate metrics.
+              Use the `ask_question` tool to ask exactly: "Do you want to raise a PR, retry the repair, or reject?"
 ```
 
-### Baseline approval gate
-
-After a successful baseline and before diagnosis, report the harness values
-that establish the baseline: event-loop p99, health success rate and p99,
-target p99, target error count, and functional-test result. Then ask exactly
-what action to take, for example:
-
-> Baseline captured: event-loop p99 is `<value> ms`; health is `<success>%`
-> successful with p99 `<value> ms`; target p99 is `<value> ms`; functional
-> tests are `<passed>` passed and `<failed>` failed. Should I continue to
-> diagnose the cause and prepare the smallest repair proposal?
-
-Do not diagnose in detail, delegate the Repairer, edit target code, or run a
-candidate experiment until the human explicitly approves.
 
 ### Repair approval gate
 
-After approved diagnosis and before a target-code edit, present the root cause,
+After automatic diagnosis and before a target-code edit, present the root cause,
 the exact files/functions to change, and the expected behavior preserved by the
-repair. Ask for approval to apply that specific repair and run the candidate
-experiment. Do not edit code before approval. This is the second user decision.
+repair. You MUST use the `ask_question` tool to ask for approval to apply that specific repair and run the candidate experiment. Do not edit code before approval.
 
 ### Pull request approval gate
 
-Only after `verify.mjs` returns `VERIFIED`, present the baseline and candidate
-values side by side with the verifier's raw verdict. Ask whether to create the
-branch, commit, and pull request. Do not make GitHub writes before approval.
-This is the third and final user decision.
+Only after `verify.mjs` returns `VERIFIED` (or the user accepts a failed but improved candidate), present the baseline and candidate values side by side with the verifier's raw verdict. You MUST use the `ask_question` tool to ask whether to create the branch, commit, and pull request. Do not make GitHub writes before approval.
 
-Do not ask for approval to provision the isolated sandbox, install project or
+**CRITICAL RULE FOR QUESTIONS:** The Root Agent MUST NOT ask any questions other than the REPAIR REVIEW (accept/reject/retry) and the PR REVIEW (accept/reject). Do not ask for approval to provision the isolated sandbox, install project or
 harness dependencies, choose a smoke check, or retry a bounded setup step. On a
 blocking setup or measurement failure, report the exact error and stop without
 turning it into an approval question.
