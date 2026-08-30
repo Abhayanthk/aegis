@@ -70,8 +70,10 @@ Return your findings as structured JSON:
     "runtime": "Node.js",
     "framework": "express",
     "entry_point": "src/server.js",
+    "package_manager": "npm",
     "test_directory": "test/",
     "test_command": "npm test",
+    "test_command_source": "package_script|test_config|none",
     "health_endpoint": "/health",
     "suspect_endpoints": ["/api/compute"]
   }
@@ -89,3 +91,9 @@ Return your findings as structured JSON:
    handles execution.
 6. **Check for existing worker thread usage.** If the repo already uses
    workers, note which patterns are and aren't offloaded.
+7. **Report test evidence faithfully.** Read package scripts and test
+   configuration. Return the exact runnable command and its source. If no real
+   suite exists, set both `test_directory` and `test_command` to `null` and set
+   `test_command_source` to `none`; never invent a test command.
+8. **Identify the package manager.** Infer it from the lockfile or repository
+   metadata and report `npm`, `pnpm`, `yarn`, `bun`, or `unknown`.

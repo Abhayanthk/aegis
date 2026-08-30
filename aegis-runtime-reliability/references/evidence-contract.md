@@ -50,7 +50,8 @@ The baseline captures the target application's behavior BEFORE any repair.
 - All metric fields present and numeric
 - `event_loop.p99_ms` significantly above normal (>50ms suggests starvation)
 - Health probe data showing degradation under load
-- Functional tests passing (baseline must be functionally correct)
+- Functional tests passing from the Analyst-reported test suite, or a documented
+  repo-local smoke check that exercises meaningful application behavior
 
 ### 2. Candidate Metrics (from `run_experiment.mjs`)
 
@@ -130,6 +131,8 @@ For the root agent to approve a PR, the following evidence chain must be complet
 - ❌ Metrics where `protocol_hash` differs between baseline and candidate
 - ❌ A FAILED verdict presented as success
 - ❌ Partial metrics (missing any required field)
+- ❌ A no-op functional command such as `exit 0`, `true`, `:`, an empty command,
+  or an output-only command presented as passing tests
 
 ---
 

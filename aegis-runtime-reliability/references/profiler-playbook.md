@@ -33,8 +33,15 @@ Using the Repository Analyst's findings, create an experiment config JSON:
 
 **Critical rules for the config:**
 - `target_endpoint` must be the suspect endpoint identified by the Analyst.
-- `health_probe_path` must be a lightweight endpoint (e.g., `/health`).
-- `functional_test_command` must run the repo's actual test suite.
+- `health_probe_path` must be the lightweight endpoint reported by the Analyst
+  (normally `/health`), not a guessed `/healthz` route.
+- Prefer a read-only suspect endpoint when it reproduces the issue; otherwise
+  use the smallest payload that reliably reaches the suspected blocking path.
+- `functional_test_command` must run the repo's actual test suite. When the
+  Analyst reports no suite, it may instead run a documented repo-local smoke
+  check against the running app that exercises meaningful behavior.
+- `functional_test_command` must never be `exit 0`, `true`, `:`, empty, or an
+  output-only command. Those are invalid evidence and the harness rejects them.
 - `connections` should be high enough to expose starvation (default: 50).
 - `duration_seconds` should be long enough for stable measurements (default: 20s).
 - Use a `request_payload` that triggers the suspect code path.
@@ -58,6 +65,11 @@ Do not install `autocannon` globally: the harness imports its local dependency.
 If Node is absent or the harness dependency install fails, report the exact
 environment error to the root agent. Do not spend the experiment phase trying
 multiple operating-system package managers.
+
+Do not install or provision Node during this role. `apt`, `brew`, `yum`, `dnf`,
+`apk`, `nvm`, `asdf`, and global npm installs are outside the Profiler's scope.
+The root agent may separately obtain human approval for environment provisioning
+and then restart this preflight from the beginning.
 
 ### 3. Run the Baseline Experiment
 
@@ -106,6 +118,7 @@ Return the raw outputs to the root agent:
 {
   "phase": "baseline|candidate|verification",
   "exit_code": 0,
+  "functional_evidence_type": "test_suite|repo_smoke",
   "metrics": { "...raw metrics.json contents..." },
   "verdict": { "...raw verdict.json contents if verification phase..." }
 }
@@ -136,3 +149,7 @@ Return the raw outputs to the root agent:
 7. **Keep setup bounded.** Reuse the same installed harness dependencies and
    config for baseline and candidate. After two setup failures, return the raw
    errors for escalation rather than guessing at more commands.
+
+8. **Preserve the evidence boundary.** A missing functional command is a
+   blocker, not permission to substitute a successful no-op. Report the
+   Analyst's `test_command: null` result to the root agent for a human decision.
