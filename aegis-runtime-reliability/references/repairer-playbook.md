@@ -242,9 +242,7 @@ const data = await fs.promises.readFile('large-file.json', 'utf-8');
 6. **Don't add error handling "improvements."** Focus on the starvation fix.
    Additional error handling changes risk breaking existing behavior.
 
-7. **One strategy at a time.** Don't combine worker_threads + chunking +
-   caching in a single attempt. Pick the most appropriate strategy, verify,
-   and iterate if needed.
+7. **Batched Fixes Allowed.** You may fix multiple independent starvation vectors (e.g. sync file I/O + heavy loops + artificial delays) in a single attempt if they all contribute to the root cause.
 
 ---
 

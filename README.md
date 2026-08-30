@@ -97,6 +97,20 @@ Thresholds are configurable via `config/verification-policy.json`.
 - No automatic merge — PRs are opened for review
 - All execution in sandbox only — no secrets in the sandbox
 
+## User Decision Points
+
+AEGIS prepares its isolated sandbox, installs required project and harness
+dependencies, and derives a health-endpoint smoke check when a repository has no
+test suite without interrupting the user. It asks for approval only three times:
+
+1. After baseline metrics are captured, to continue to diagnosis.
+2. After it presents the evidence-backed repair proposal, to apply that change.
+3. After a VERIFIED baseline/candidate comparison, to create the branch, commit,
+   and pull request.
+
+Setup failures are reported with their exact error and stop the run; they are not
+presented as approval dialogs.
+
 ## Getting Started
 
 ```bash

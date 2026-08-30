@@ -116,9 +116,14 @@ For the root agent to approve a PR, the following evidence chain must be complet
 | 3. Diagnosis | Root cause explanation citing specific metrics | Root agent interpretation of baseline |
 | 4. Repair | Code diff showing minimal, targeted changes | Performance Repairer |
 | 5. Verification | Candidate metrics + VERIFIED verdict | `run_experiment.mjs` + `verify.mjs` |
-| 6. Approval | Human sign-off | Human via MCP |
+| 6. PR approval | Human approval to create the branch, commit, and PR | Human via MCP |
 
 **A missing link in this chain means the PR cannot be opened.**
+
+The root agent also requires human approval after baseline capture and after it
+presents the proposed repair, before it edits target code. Sandbox setup,
+dependency installation, and automatic health-endpoint smoke checks are
+operational steps, not approval checkpoints.
 
 ---
 

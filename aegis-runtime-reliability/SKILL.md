@@ -82,11 +82,11 @@ outside the sandbox. Never put secrets in the sandbox.
 
 1. Resolve the skill directory and playbook paths to absolute paths.
 2. Start the Repository Analyst and the Profiler preparation lanes in parallel.
-3. The Profiler runs exactly one environment preflight: `node --version`,
-   `npm --version`, then one harness install attempt from `scripts/` when Node
-   is available. If any prerequisite is unavailable, report the exact error and
-   stop that lane; do not install a runtime with an operating-system package
-   manager during profiling.
+3. The Profiler runs the environment preflight and automatically prepares the
+   isolated sandbox: install a supported Node.js runtime when needed, then
+   install target and harness dependencies once using their lockfiles. Never
+   ask the user to approve this sandbox-only setup. If setup fails, report the
+   exact error and stop because a baseline cannot be produced.
 4. Wait for the Analyst's structured report, then select the target endpoint,
    health endpoint, payload, package manager, and real functional command.
 5. Run one baseline. Only after the baseline succeeds, present the required
@@ -109,25 +109,31 @@ REPRODUCE ──→ Run baseline experiment (scripts/run_experiment.mjs)
 │            MUST succeed (exit 0) before proceeding
 │            If exit != 0: fix config and retry, do NOT guess metrics
  ▼
-BASELINE REVIEW ──→ Present baseline evidence and ask for approval to repair
- │                  Wait for an explicit human "proceed" before editing code
+BASELINE REVIEW ──→ Present baseline evidence and ask to continue to diagnosis
+ │                  Wait for explicit human approval before diagnosis
  │                  If declined: stop and retain the baseline evidence
  ▼
 DIAGNOSE ──→ Interpret approved baseline metrics to identify root cause
- │            Read the JSON output — never fabricate numbers
+ │            Produce the smallest evidence-backed repair proposal
+ ▼
+REPAIR REVIEW ──→ Present the proposed code change and ask to apply it
+ │                 Wait for explicit human approval before any code edit
  ▼
 REPAIR ──→ Delegate to Performance Repairer (max 3 attempts)
  │          Repairer edits code, then Profiler re-runs experiment
  │          verify.mjs compares candidate vs baseline
  │          │
- │          ├─ VERIFIED → proceed to APPROVE
- │          ├─ FAILED   → Repairer tries again (up to max_repair_attempts)
+ │          ├─ VERIFIED → Ask human: "The candidate passed verification. Do you want to try and repair further?"
+ │          │             (Yes → loop back to REPAIR, No → proceed to PR REVIEW)
+ │          ├─ FAILED   → Ask human: "The candidate failed verification but may have improved. Is this valuation good enough?"
+ │          │             (Yes → loop back to REPAIR for more fixes, No → proceed to PR REVIEW)
  │          ├─ RETRY    → Re-run experiment (transient issue)
  │          ├─ INCOMPARABLE → Fix protocol mismatch, re-run
  │          └─ ESCALATE → Stop, report evidence to human
  ▼
-APPROVE ──→ Present verdict + evidence to human for approval
- │           human_approval_required_before_github_write = true
+PR REVIEW ──→ Present baseline/candidate comparison and VERIFIED verdict
+ │            Ask approval to create the branch, commit, and pull request
+ │            human_approval_required_before_github_write = true
  ▼
 PR ──→ Commit changes and open a pull request
        automatic_merge = false
@@ -135,19 +141,45 @@ PR ──→ Commit changes and open a pull request
 
 ### Baseline approval gate
 
-After a successful baseline and before any code edit, report the harness values
+After a successful baseline and before diagnosis, report the harness values
 that establish the baseline: event-loop p99, health success rate and p99,
 target p99, target error count, and functional-test result. Then ask exactly
 what action to take, for example:
 
 > Baseline captured: event-loop p99 is `<value> ms`; health is `<success>%`
 > successful with p99 `<value> ms`; target p99 is `<value> ms`; functional
-> tests are `<passed>` passed and `<failed>` failed. Should I proceed with the
-> smallest repair and run the candidate verification?
+> tests are `<passed>` passed and `<failed>` failed. Should I continue to
+> diagnose the cause and prepare the smallest repair proposal?
 
 Do not diagnose in detail, delegate the Repairer, edit target code, or run a
-candidate experiment until the human explicitly approves. This approval permits
-the repair-and-verification loop only; GitHub writes still need separate approval.
+candidate experiment until the human explicitly approves.
+
+### Repair approval gate
+
+After approved diagnosis and before a target-code edit, present the root cause,
+the exact files/functions to change, and the expected behavior preserved by the
+repair. Ask for approval to apply that specific repair and run the candidate
+experiment. Do not edit code before approval. This is the second user decision.
+
+### Pull request approval gate
+
+Only after `verify.mjs` returns `VERIFIED`, present the baseline and candidate
+values side by side with the verifier's raw verdict. Ask whether to create the
+branch, commit, and pull request. Do not make GitHub writes before approval.
+This is the third and final user decision.
+
+### User interaction policy
+
+Ask for a user decision at exactly these three workflow checkpoints:
+
+1. baseline captured: continue to diagnosis;
+2. repair proposal ready: apply the proposed code change; and
+3. candidate verified (or partially improved): loop for more fixes or create the pull request.
+
+Do not ask for approval to provision the isolated sandbox, install project or
+harness dependencies, choose a smoke check, or retry a bounded setup step. On a
+blocking setup or measurement failure, report the exact error and stop without
+turning it into an approval question.
 
 ---
 
@@ -187,10 +219,11 @@ when none exists). If the playbook cannot be read, stop and report that blocker.
 ```text
 You are the Runtime Profiler in the preparation phase. Before any work, read
 {skill_dir}/references/profiler-playbook.md in full. Run only the documented
-Node/npm preflight and one local harness dependency install attempt. Do not run
-the target application, install Node, use an OS package manager, or create an
-experiment config until the Analyst artifact is supplied. Return the required
-raw JSON result. If the playbook cannot be read, stop and report that blocker.
+Node/npm preflight and automatic sandbox setup. You may provision Node >=18 and
+install target and local harness dependencies inside the sandbox; do not modify
+the host or install global packages. Do not run the target application or create
+an experiment config until the Analyst artifact is supplied. Return the required
+raw JSON result. If setup fails, report the error without asking the user.
 ```
 
 **Runtime Profiler experiment**
@@ -312,20 +345,23 @@ node scripts/verify.mjs --baseline <baseline/metrics.json> \
     candidate metrics and verdict JSON both exist. Report raw values, not
     informal benchmark summaries, to the user.
 
-14. **Baseline approval is mandatory.** A successful baseline is evidence, not
-    authorization to edit. Wait for explicit approval before entering
-    DIAGNOSE or REPAIR.
+14. **Three user decisions only.** Ask only after baseline capture, after an
+    evidence-backed repair proposal, and after a VERIFIED comparison before a
+    pull request. Setup, dependency installation, smoke-test selection, and
+    bounded retries are automatic sandbox operations.
 
 15. **No fake functional pass.** `functional_test_command` must execute the
-    repository's real test suite or a documented, meaningful repo-local smoke
+    repository's real test suite or the harness's meaningful health smoke
     check. Never use `exit 0`, `true`, `:`, an empty command, or output-only
-    commands. When no meaningful test or smoke command exists, stop and ask the
-    human to approve adding coverage before repair.
+    commands. When no suite exists, omit `functional_test_command`; the harness
+    automatically probes the Analyst-reported health endpoint and fails on a
+    non-2xx response. Do not ask the user to choose this fallback.
 
-16. **No runtime provisioning during profiling.** If Node or the harness
-    dependency install is unavailable, report the exact preflight error. Do not
-    run `apt`, `brew`, `yum`, `dnf`, `apk`, `nvm`, `asdf`, or a global npm
-    install in the experiment phase.
+16. **Sandbox setup is automatic and contained.** Provision Node >=18 with the
+    sandbox-supported mechanism (use `nvm` when available), and install only
+    lockfile-respecting target and local harness dependencies. Never use `sudo`,
+    modify the host, or install global packages. A setup failure is reported as
+    a blocker, not presented as a user choice.
 
 ---
 
@@ -371,9 +407,10 @@ reachable suspect. Prefer a read-only endpoint when it exercises the failure;
 otherwise use the smallest payload that reliably triggers the suspect path.
 Set `health_probe_path` to the independent lightweight endpoint reported by the
 Analyst, not a guessed `/healthz` route. Set `functional_test_command` to the
-reported real test command. If the repository has no suite, use a documented
-repo-local smoke command that makes a meaningful request to the running app; a
-no-op command is invalid and the harness rejects it.
+reported real test command. If the repository has no suite, omit
+`functional_test_command`; the harness runs the documented health smoke check
+against the Analyst-reported endpoint. A no-op command is invalid and the
+harness rejects it.
 
 For a nested target repository, keep the process foregrounded in the config,
 for example: `"start_command": "cd nodetest && node src/server.js"`. The

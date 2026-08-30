@@ -97,3 +97,4 @@ Return your findings as structured JSON:
    `test_command_source` to `none`; never invent a test command.
 8. **Identify the package manager.** Infer it from the lockfile or repository
    metadata and report `npm`, `pnpm`, `yarn`, `bun`, or `unknown`.
+9. **Categorize blockers.** If you identify artificial busy-waits or useless CPU-spinning (e.g. `Math.sqrt(Math.random())`), explicitly authorize the Repairer to completely delete them rather than carefully making them asynchronous.

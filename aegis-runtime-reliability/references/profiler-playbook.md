@@ -38,8 +38,9 @@ Using the Repository Analyst's findings, create an experiment config JSON:
 - Prefer a read-only suspect endpoint when it reproduces the issue; otherwise
   use the smallest payload that reliably reaches the suspected blocking path.
 - `functional_test_command` must run the repo's actual test suite. When the
-  Analyst reports no suite, it may instead run a documented repo-local smoke
-  check against the running app that exercises meaningful behavior.
+  Analyst reports no suite, omit this optional field. The harness automatically
+  runs a health smoke check against the reported health endpoint and fails on a
+  non-2xx response; do not ask the user to choose this fallback.
 - `functional_test_command` must never be `exit 0`, `true`, `:`, empty, or an
   output-only command. Those are invalid evidence and the harness rejects them.
 - `connections` should be high enough to expose starvation (default: 50).
@@ -49,8 +50,13 @@ Using the Repository Analyst's findings, create an experiment config JSON:
 ### 2. Prepare Dependencies Once
 
 Run one environment check (`node --version` and `npm --version`) before the
-first experiment. If Node is available, do not install or upgrade it. Install
-the AEGIS harness dependencies once from the `scripts/` directory:
+first experiment. If Node is absent, automatically provision Node.js >=18 in
+the Daytona sandbox using its supported mechanism (`nvm` when available). Do
+not request user approval for this isolated setup and never modify the host.
+
+Install the target repository dependencies once using the Analyst-reported
+package manager and its lockfile, then install the AEGIS harness dependencies
+once from the `scripts/` directory:
 
 ```bash
 # When scripts/package-lock.json exists
@@ -62,14 +68,11 @@ cd scripts && npm install
 
 Do not install `autocannon` globally: the harness imports its local dependency.
 
-If Node is absent or the harness dependency install fails, report the exact
-environment error to the root agent. Do not spend the experiment phase trying
-multiple operating-system package managers.
-
-Do not install or provision Node during this role. `apt`, `brew`, `yum`, `dnf`,
-`apk`, `nvm`, `asdf`, and global npm installs are outside the Profiler's scope.
-The root agent may separately obtain human approval for environment provisioning
-and then restart this preflight from the beginning.
+Use lockfile-respecting installs where supported (`npm ci`, `pnpm install
+--frozen-lockfile`, or `yarn install --immutable`). Do not use `sudo`, modify
+the host, or install global packages. If provisioning or either dependency
+install fails, report the exact error to the root agent and stop this lane; do
+not ask the user for a choice or cycle through package managers.
 
 ### 3. Run the Baseline Experiment
 
@@ -150,6 +153,7 @@ Return the raw outputs to the root agent:
    config for baseline and candidate. After two setup failures, return the raw
    errors for escalation rather than guessing at more commands.
 
-8. **Preserve the evidence boundary.** A missing functional command is a
-   blocker, not permission to substitute a successful no-op. Report the
-   Analyst's `test_command: null` result to the root agent for a human decision.
+8. **Preserve the evidence boundary.** A missing functional command is never
+   permission to substitute a successful no-op. When the Analyst reports
+   `test_command: null`, omit `functional_test_command`; the harness performs
+   the required health-endpoint smoke check and it is reported as `repo_smoke`.
