@@ -58,9 +58,7 @@ first experiment. If Node is absent, automatically provision Node.js >=18 in
 the Daytona sandbox using its supported mechanism (`nvm` when available). Do
 not request user approval for this isolated setup and never modify the host.
 
-Install the target repository dependencies once using the Analyst-reported
-package manager and its lockfile, then install the AEGIS harness dependencies
-once from the `scripts/` directory:
+Install the AEGIS harness dependencies once from the `scripts/` directory:
 
 ```bash
 # When scripts/package-lock.json exists
@@ -74,11 +72,15 @@ Do not install `autocannon` globally: the harness imports its local dependency.
 
 Use lockfile-respecting installs where supported (`npm ci`, `pnpm install
 --frozen-lockfile`, or `yarn install --immutable`). Do not use `sudo`, modify
-the host, or install global packages. If provisioning or either dependency
+the host, or install global packages. If provisioning or dependency
 install fails, report the exact error to the root agent and stop this lane; do
-not ask the user for a choice or cycle through package managers.
+not ask the user for a choice.
 
 ### 3. Run the Baseline Experiment
+
+Before running the experiment, install the target repository dependencies once using the package manager specified in the Analyst Report and its lockfile (e.g. `npm ci`, `yarn install`).
+
+Then run the harness:
 
 ```bash
 node scripts/run_experiment.mjs --config experiment-config.json --output baseline/metrics.json

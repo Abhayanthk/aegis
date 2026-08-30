@@ -86,13 +86,10 @@ outside the sandbox. Never put secrets in the sandbox.
 2. Start the Repository Analyst and the Profiler preparation lanes in parallel.
 3. The Profiler runs the environment preflight and automatically prepares the
    isolated sandbox: install a supported Node.js runtime when needed, then
-   install target and harness dependencies once using their lockfiles. Never
-   ask the user to approve this sandbox-only setup. If setup fails, report the
-   exact error and stop because a baseline cannot be produced.
-4. Wait for the Analyst's structured report, then the Profiler creates the
-   experiment config using the Analyst's endpoint details. The **Profiler owns
-   the experiment config**; config schema and load profile defaults are in
-   `references/profiler-playbook.md`.
+   install harness dependencies using their lockfiles. Target dependencies
+   will be installed during the Baseline phase. Never ask the user to approve
+   this sandbox-only setup. If setup fails, report the exact error and stop.
+4. Wait for BOTH subagents to complete. DO NOT analyze the repository yourself. Extract the Analyst's structured JSON report verbatim. Then delegate to the Profiler (Baseline phase) and pass the raw JSON into its prompt so it can create the experiment config.
 5. Run one baseline. Only after the baseline succeeds, present the required
    evidence and wait for explicit human approval before any target-code edit.
 
@@ -105,16 +102,25 @@ Every engagement follows this sequence. Do NOT skip steps.
 ```
 IDLE
  │
+ ├─► ANALYZE ──→ Delegate to Repository Analyst
+ │               Read repo, find entry points, and identify suspect bottlenecks.
+ │
+ └─► PREPARE ──→ Delegate to Runtime Profiler (Preparation phase)
+                 Set up sandbox, install Node/npm, and install harness dependencies.
+                 Do not run experiments. MUST succeed before proceeding.
+
+ (Wait for BOTH ANALYZE and PREPARE to complete)
+ │
  ▼
-ANALYZE ──→ Delegate to Repository Analyst
- │          Read repo, find entry points, and identify suspect bottlenecks.
+ (EXTRACT Analyst JSON Report: Do NOT analyze the repo yourself!)
+ │
  ▼
-BASELINE ──→ Delegate to Runtime Profiler (Preparation + Baseline phases)
- │           Set up sandbox, run load test, and generate baseline metrics.
+BASELINE ──→ Delegate to Runtime Profiler (Baseline phase)
+ │           Create config, run load test, and generate baseline metrics.
  │           MUST succeed (exit 0) before proceeding.
  ▼
-DIAGNOSE ──→ Interpret baseline metrics to identify root cause
- │           Produce the smallest evidence-backed repair proposal
+DIAGNOSE ──→ Interpret baseline metrics to confirm the server is suffering from starvation.
+ │           Instruct the Repairer to apply Batched Fixes for ALL suspect bottlenecks found by the Analyst.
  ▼
 REPAIR REVIEW ──→ Present the proposed code change and ask to apply it
  │                Use the `ask_question` tool to get explicit human approval before any code edit
@@ -143,7 +149,7 @@ PR REVIEW ──→ Present all findings to the user (Root Agent)
 
 After automatic diagnosis and before a target-code edit, present the root cause,
 the exact files/functions to change, and the expected behavior preserved by the
-repair. You MUST use the `ask_question` tool to ask for approval to apply that specific repair and run the candidate experiment. Do not edit code before approval.
+repair. You MUST propose fixing ALL bottlenecks identified by the Analyst (Batched Fixes). You MUST use the `ask_question` tool to ask for approval to apply these repairs and run the candidate experiment. Do not edit code before approval.
 
 ### Pull request approval gate
 
@@ -202,7 +208,7 @@ report that blocker.
 You are the Runtime Profiler in the preparation phase. Before any work, read
 {skill_dir}/references/profiler-playbook.md in full. Run only the documented
 Node/npm preflight and automatic sandbox setup. You may provision Node >=18 and
-install target and local harness dependencies inside the sandbox; do not modify
+install local harness dependencies inside the sandbox; do not modify
 the host or install global packages. Do not run the target application or create
 an experiment config. Return the required preparation phase JSON result. If setup
 fails, report the error without asking the user.
@@ -219,6 +225,7 @@ Analyst Report: <INSERT RAW JSON OR ABSOLUTE PATH TO FILE>
 Repository Path: <ABSOLUTE PATH TO REPO>
 
 CREATE the experiment config and write it to: <ABSOLUTE PATH>/experiment-config.json
+Install the target repository dependencies using the package manager from the Analyst Report.
 Then run the baseline experiment. Return the baseline phase JSON result. Do not interpret
 the verdict, alter target code, or replace a missing test command with a no-op.
 If the playbook cannot be read, stop and report that blocker.
