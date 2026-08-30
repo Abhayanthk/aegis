@@ -44,9 +44,12 @@ const statusDotColors: Record<string, string> = {
 
 export function ProjectCard({ project }: ProjectCardProps) {
   const dotColor = statusDotColors[project.status] || statusDotColors.new;
+  const targetUrl = project.latestInvestigation 
+    ? `/projects/${project.id}/investigations/${project.latestInvestigation.id}`
+    : `/projects/${project.id}/investigations/new`;
 
   return (
-    <Link href={`/projects/${project.id}`} className="group block h-[200px]">
+    <Link href={targetUrl} className="group block h-[200px]">
       <div className="flex flex-col h-full rounded-[8px] border border-[var(--ds-hairline)] bg-[var(--ds-surface-1)]/40 p-5 transition-colors duration-200 hover:bg-[var(--ds-surface-1)]">
         {/* Top Header */}
         <div className="flex items-start justify-between">

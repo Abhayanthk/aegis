@@ -1,6 +1,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
 import {
@@ -37,21 +38,61 @@ export function Navbar() {
 
   // Build breadcrumb from pathname
   const segments = pathname.split("/").filter(Boolean);
-  const currentPage = segments.length > 1 ? segments[segments.length - 1] : "Dashboard";
-  const pageTitle = routeTitles[currentPage] ?? currentPage;
+  
+  let breadcrumbContent = null;
+  
+  if (segments[0] === "projects" && segments.length >= 2 && segments[1] !== "new") {
+    const projectName = segments[1];
+    
+    // Check if we're in an investigation route
+    if (segments[2] === "investigations" && segments[3]) {
+      const investigationId = segments[3].toUpperCase();
+      breadcrumbContent = (
+        <>
+          <ChevronRight className="h-3 w-3 text-[var(--ds-ink-tertiary)]" />
+          <Link href="/projects" className="font-medium text-[var(--ds-ink-subtle)] hover:text-[var(--ds-ink)] transition-colors">
+            {projectName}
+          </Link>
+          <ChevronRight className="h-3 w-3 text-[var(--ds-ink-tertiary)]" />
+          <span className="font-medium text-[var(--ds-ink)]">
+            Investigation #{investigationId}
+          </span>
+        </>
+      );
+    } else {
+      // Just project overview
+      breadcrumbContent = (
+        <>
+          <ChevronRight className="h-3 w-3 text-[var(--ds-ink-tertiary)]" />
+          <span className="font-medium text-[var(--ds-ink)]">
+            {projectName}
+          </span>
+        </>
+      );
+    }
+  } else {
+    const currentPage = segments.length > 1 ? segments[segments.length - 1] : segments.length === 1 ? segments[0] : "Dashboard";
+    const pageTitle = routeTitles[currentPage] ?? currentPage;
+    
+    if (segments.length > 0) {
+      breadcrumbContent = (
+        <>
+          <ChevronRight className="h-3 w-3 text-[var(--ds-ink-tertiary)]" />
+          <span className="font-medium text-[var(--ds-ink)] capitalize">{pageTitle}</span>
+        </>
+      );
+    }
+  }
 
   return (
     <div className="fixed top-0 left-0 right-0 z-50 px-3 pt-3 md:px-4 md:pt-4">
       <header className="flex h-11 items-center rounded-[var(--ds-rounded-lg)] border border-[var(--ds-hairline)] bg-[var(--ds-surface-1)] px-4">
       {/* Left: breadcrumb */}
       <div className="flex items-center gap-1.5 text-[13px]">
-        <span className="font-medium text-[var(--ds-ink-subtle)]">AEGIS</span>
-        {segments.length > 1 && (
-          <>
-            <ChevronRight className="h-3 w-3 text-[var(--ds-ink-tertiary)]" />
-            <span className="font-medium text-[var(--ds-ink)]">{pageTitle}</span>
-          </>
-        )}
+        <Link href="/projects" className="font-medium text-[var(--ds-ink-subtle)] hover:text-[var(--ds-ink)] transition-colors">
+          AEGIS
+        </Link>
+        {breadcrumbContent}
       </div>
 
       {/* Center: toolbar actions */}
