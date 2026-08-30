@@ -89,10 +89,7 @@ outside the sandbox. Never put secrets in the sandbox.
    install target and harness dependencies once using their lockfiles. Never
    ask the user to approve this sandbox-only setup. If setup fails, report the
    exact error and stop because a baseline cannot be produced.
-4. Wait for the Analyst's structured report, then the Profiler creates the
-   experiment config using the Analyst's endpoint details. The **Profiler owns
-   the experiment config**; config schema and load profile defaults are in
-   `references/profiler-playbook.md`.
+4. Wait for BOTH subagents to complete. DO NOT analyze the repository yourself. Extract the Analyst's structured JSON report verbatim. Then delegate to the Profiler (Baseline phase) and pass the raw JSON into its prompt so it can create the experiment config.
 5. Run one baseline. Only after the baseline succeeds, present the required
    evidence and wait for explicit human approval before any target-code edit.
 
@@ -113,6 +110,9 @@ IDLE
                  Do not run experiments. MUST succeed before proceeding.
 
  (Wait for BOTH ANALYZE and PREPARE to complete)
+ │
+ ▼
+ (EXTRACT Analyst JSON Report: Do NOT analyze the repo yourself!)
  │
  ▼
 BASELINE ──→ Delegate to Runtime Profiler (Baseline phase)
