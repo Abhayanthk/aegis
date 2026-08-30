@@ -100,7 +100,7 @@ outside the sandbox. Never put secrets in the sandbox.
 
 ## State Machine
 
-Every engagement follows this fully autonomous sequence. Do NOT pause for user approval until the final REVIEW step.
+Every engagement follows this sequence. Do NOT skip steps.
 
 ```
 IDLE
@@ -113,7 +113,13 @@ BASELINE ──→ Delegate to Runtime Profiler (Preparation + Baseline phases)
  │           Set up sandbox, run load test, and generate baseline metrics.
  │           MUST succeed (exit 0) before proceeding.
  ▼
-REPAIR ──→ Delegate to Performance Repairer
+DIAGNOSE ──→ Interpret baseline metrics to identify root cause
+ │           Produce the smallest evidence-backed repair proposal
+ ▼
+REPAIR REVIEW ──→ Present the proposed code change and ask to apply it
+ │                Use the `ask_question` tool to get explicit human approval before any code edit
+ ▼
+REPAIR ──→ Delegate to Performance Repairer (max 3 attempts)
  │         Use Analyst output and Baseline metrics to apply the best repair pattern.
  │         Generate minimal code diff.
  ▼
@@ -121,12 +127,26 @@ CANDIDATE ──→ Delegate to Runtime Profiler (Candidate phase)
  │            Re-run the exact same experiment against the edited code.
  │            verify.mjs compares candidate vs baseline.
  ▼
-REVIEW ──→ Present all findings to the user (Root Agent)
-           Show the Analyst bottlenecks, Baseline metrics, code diff, and Candidate metrics.
-           Ask the user exactly: "Do you want to raise a PR, retry the repair, or reject?"
+PR REVIEW ──→ Present all findings to the user (Root Agent)
+              Show the Analyst bottlenecks, Baseline metrics, code diff, and Candidate metrics.
+              Use the `ask_question` tool to ask exactly: "Do you want to raise a PR, retry the repair, or reject?"
 ```
 
-Do not halt the autonomous pipeline (`ANALYZE` -> `BASELINE` -> `REPAIR` -> `CANDIDATE`) for any mid-step user confirmations. The pipeline must run head-to-tail and only present the final combined report and `REVIEW` decision to the user.
+
+### Repair approval gate
+
+After automatic diagnosis and before a target-code edit, present the root cause,
+the exact files/functions to change, and the expected behavior preserved by the
+repair. You MUST use the `ask_question` tool to ask for approval to apply that specific repair and run the candidate experiment. Do not edit code before approval.
+
+### Pull request approval gate
+
+Only after `verify.mjs` returns `VERIFIED` (or the user accepts a failed but improved candidate), present the baseline and candidate values side by side with the verifier's raw verdict. You MUST use the `ask_question` tool to ask whether to create the branch, commit, and pull request. Do not make GitHub writes before approval.
+
+**CRITICAL RULE FOR QUESTIONS:** The Root Agent MUST NOT ask any questions other than the REPAIR REVIEW (accept/reject/retry) and the PR REVIEW (accept/reject). Do not ask for approval to provision the isolated sandbox, install project or
+harness dependencies, choose a smoke check, or retry a bounded setup step. On a
+blocking setup or measurement failure, report the exact error and stop without
+turning it into an approval question.
 
 ---
 
