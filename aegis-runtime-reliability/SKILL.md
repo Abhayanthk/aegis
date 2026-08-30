@@ -126,6 +126,12 @@ REPAIR ──→ Delegate to Performance Repairer (max 3 attempts)
 CANDIDATE ──→ Delegate to Runtime Profiler (Candidate phase)
  │            Re-run the exact same experiment against the edited code.
  │            verify.mjs compares candidate vs baseline.
+ │          │
+ │          ├─ VERIFIED → Proceed to PR REVIEW
+ │          ├─ FAILED   → Loop back to REPAIR (max 3 attempts). If 3 attempts fail, ESCALATE.
+ │          ├─ RETRY    → Re-run experiment (transient issue)
+ │          ├─ INCOMPARABLE → Fix protocol mismatch, re-run
+ │          └─ ESCALATE → Stop, report evidence to human
  ▼
 PR REVIEW ──→ Present all findings to the user (Root Agent)
               Show the Analyst bottlenecks, Baseline metrics, code diff, and Candidate metrics.
