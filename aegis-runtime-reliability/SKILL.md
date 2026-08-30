@@ -242,7 +242,7 @@ Analyst Report: <INSERT RAW JSON OR ABSOLUTE PATH TO FILE>
 Repository Path: <ABSOLUTE PATH TO REPO>
 
 CREATE the experiment config and write it to: <ABSOLUTE PATH>/experiment-config.json
-Then run the baseline experiment. Return the raw JSON output. Do not interpret
+Then run the baseline experiment. Return the baseline phase JSON result. Do not interpret
 the verdict, alter target code, or replace a missing test command with a no-op.
 If the playbook cannot be read, stop and report that blocker.
 ```
@@ -259,8 +259,8 @@ Baseline Metrics: <INSERT RAW JSON OR ABSOLUTE PATH TO baseline/metrics.json>
 Experiment Config: <ABSOLUTE PATH TO experiment-config.json>
 
 REUSE the supplied experiment config file (do NOT create a new one). Run the
-candidate experiment, and then run the verification script. Return the raw JSON
-outputs. Do not interpret the verdict or alter target code. If the playbook
+candidate experiment, and then run the verification script. Return the candidate phase JSON
+result. Do not interpret the verdict or alter target code. If the playbook
 cannot be read, stop and report that blocker.
 ```
 

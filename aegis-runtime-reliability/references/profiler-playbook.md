@@ -132,17 +132,29 @@ Return the raw outputs to the root agent. The exact fields required depend on yo
 }
 ```
 
-**For `baseline`, `candidate`, or `verification` phase:**
+**For `baseline` phase:**
 ```json
 {
-  "phase": "baseline|candidate|verification",
+  "phase": "baseline",
   "exit_code": 0,
   "functional_evidence_type": "test_suite|repo_smoke",
   "metrics_path": "<absolute path to written metrics.json>",
   "config_path": "<absolute path to experiment-config.json>",
-  "verdict_path": "<absolute path to verdict.json, if verification phase, else null>",
+  "metrics": { "...raw metrics.json contents..." }
+}
+```
+
+**For `candidate` phase:**
+```json
+{
+  "phase": "candidate",
+  "exit_code": 0,
+  "functional_evidence_type": "test_suite|repo_smoke",
+  "metrics_path": "<absolute path to written candidate metrics.json>",
+  "config_path": "<absolute path to experiment-config.json>",
+  "verdict_path": "<absolute path to verdict.json>",
   "metrics": { "...raw metrics.json contents..." },
-  "verdict": { "...raw verdict.json contents if verification phase, else null..." }
+  "verdict": { "...raw verdict.json contents..." }
 }
 ```
 
