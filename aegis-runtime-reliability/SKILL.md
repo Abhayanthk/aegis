@@ -117,8 +117,8 @@ BASELINE ──→ Delegate to Runtime Profiler (Baseline phase)
  │           Create config, run load test, and generate baseline metrics.
  │           MUST succeed (exit 0) before proceeding.
  ▼
-DIAGNOSE ──→ Interpret baseline metrics to identify root cause
- │           Produce the smallest evidence-backed repair proposal
+DIAGNOSE ──→ Interpret baseline metrics to confirm the server is suffering from starvation.
+ │           Instruct the Repairer to apply Batched Fixes for ALL suspect bottlenecks found by the Analyst.
  ▼
 REPAIR REVIEW ──→ Present the proposed code change and ask to apply it
  │                Use the `ask_question` tool to get explicit human approval before any code edit
@@ -147,7 +147,7 @@ PR REVIEW ──→ Present all findings to the user (Root Agent)
 
 After automatic diagnosis and before a target-code edit, present the root cause,
 the exact files/functions to change, and the expected behavior preserved by the
-repair. You MUST use the `ask_question` tool to ask for approval to apply that specific repair and run the candidate experiment. Do not edit code before approval.
+repair. You MUST propose fixing ALL bottlenecks identified by the Analyst (Batched Fixes). You MUST use the `ask_question` tool to ask for approval to apply these repairs and run the candidate experiment. Do not edit code before approval.
 
 ### Pull request approval gate
 
