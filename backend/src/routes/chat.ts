@@ -102,13 +102,28 @@ async function streamTurn(
   }
 }
 
-router.post("/", async (req: Request, res: Response) => {
-  const { message, sessionId } = req.body as { message?: unknown; sessionId?: unknown };
+// Helper to construct the system prompt based on user's requirements
+const constructPrompt = (repoUrl: string) => {
+  return `Use the aegis-runtime-reliability-v3 skill on ${repoUrl}
 
-  if (!isNonEmptyString(message)) {
-    return res.status(400).json({ error: "Message is required" });
+Before you take any action or launch any subagents, you MUST read the newly updated skill instructions at \`/opt/tf/skills/aegis-runtime-reliability-v3/SKILL.md\`. I have updated the State Machine and the Startup Checklist, and you must follow them strictly:
+
+1. **Parallel Execution:** You must launch the \`Repository Analyst\` and \`Runtime Profiler preparation\` subagents in parallel as your very first action.
+2. **Data Handoff:** Wait for both to complete. DO NOT analyze the repository yourself. Extract the Analyst's structured JSON report verbatim and pass it directly into the \`Runtime Profiler baseline\` subagent prompt. 
+3. **Target Dependencies:** Remember that target dependencies are now installed by the Baseline subagent, using the package manager identified in the Analyst Report.
+4. **Batched Fixes:** When you reach the DIAGNOSE phase, you MUST instruct the Repairer to apply Batched Fixes for ALL suspect bottlenecks found by the Analyst simultaneously. Do not limit it to just one endpoint.
+5. **Full Autonomy:** Do NOT ask me for permission to repair. Let the Repairer edit the code and let the Profiler run the Candidate test completely autonomously. You may ONLY use the ask_question tool at the very end of the pipeline when the candidate is verified (the final REVIEW gate).`;
+};
+
+router.post("/", async (req: Request, res: Response) => {
+  const { message, sessionId, repoUrl } = req.body as { message?: unknown; sessionId?: unknown; repoUrl?: unknown };
+
+  const prompt = isNonEmptyString(repoUrl) ? constructPrompt(repoUrl) : message;
+
+  if (!isNonEmptyString(prompt)) {
+    return res.status(400).json({ error: "Message or repoUrl is required" });
   }
-  if (message.length > 100_000) {
+  if (prompt.length > 100_000) {
     return res.status(400).json({ error: "Message exceeds the 100,000 character limit" });
   }
   if (sessionId !== undefined && !isNonEmptyString(sessionId)) {
@@ -121,7 +136,7 @@ router.post("/", async (req: Request, res: Response) => {
     })).data.id;
 
     await streamTurn(req, res, activeSessionId, [
-      { type: "user.message", content: message.trim() },
+      { type: "user.message", content: prompt.trim() },
     ]);
   } catch (error) {
     streamError(res, error);
