@@ -56,16 +56,18 @@ do not pretend that sequential work is parallel.
 
 ### Subagent context handoff is explicit
 
-Subagents do **not** inherit the root agent's loaded skill, decisions, or
-playbooks. Before creating a subagent task, resolve this skill directory to an
-absolute path and include all of the following in that subagent's prompt:
+Subagents have ZERO inherited memory and cannot "see previous output". Before
+creating a subagent task, resolve this skill directory to an absolute path and
+include all of the following in that subagent's prompt:
 
 1. its role and current phase;
 2. the absolute path to its exact playbook, with an instruction to read it in
    full before doing any work;
-3. the allowed inputs and allowed side effects for that phase;
-4. the required output schema or artifact paths; and
-5. an instruction to stop and report a blocker if the playbook cannot be read.
+3. the absolute paths to any required artifact files (or the raw JSON embedded
+   directly in the prompt). **NEVER say "see previous output"**.
+4. the allowed inputs and allowed side effects for that phase;
+5. the required output schema or artifact paths; and
+6. an instruction to stop and report a blocker if the playbook cannot be read.
 
 Do not substitute a remembered summary for the playbook. Do not give a
 subagent a relative `references/...` path. The root agent remains responsible
@@ -219,27 +221,54 @@ You are the Runtime Profiler in the preparation phase. Before any work, read
 Node/npm preflight and automatic sandbox setup. You may provision Node >=18 and
 install target and local harness dependencies inside the sandbox; do not modify
 the host or install global packages. Do not run the target application or create
-an experiment config until the Analyst artifact is supplied. Return the required
-raw JSON result. If setup fails, report the error without asking the user.
+an experiment config. Return the required raw JSON result. If setup fails, report
+the error without asking the user.
 ```
 
-**Runtime Profiler experiment**
+**Runtime Profiler baseline**
 
 ```text
-You are the Runtime Profiler for the supplied baseline or candidate phase.
-Before any work, read {skill_dir}/references/profiler-playbook.md in full. Use
-the supplied Analyst artifact and the same saved config for both runs. Run only
-the AEGIS harness and verifier; return their raw JSON outputs. Do not interpret
-the verdict, alter target code, or replace a missing test command with a no-op.
-If the playbook cannot be read, stop and report that blocker.
+You are the Runtime Profiler for the BASELINE phase. Before any work, read
+{skill_dir}/references/profiler-playbook.md in full.
+
+You have zero memory of the prior conversation. You must use:
+Analyst Report: <INSERT RAW JSON OR ABSOLUTE PATH TO FILE>
+
+CREATE the experiment-config.json using the Analyst artifact, then run the
+baseline experiment. Return the raw JSON output. Do not interpret the verdict,
+alter target code, or replace a missing test command with a no-op. If the
+playbook cannot be read, stop and report that blocker.
+```
+
+**Runtime Profiler candidate**
+
+```text
+You are the Runtime Profiler for the CANDIDATE phase. Before any work, read
+{skill_dir}/references/profiler-playbook.md in full.
+
+You have zero memory of the prior conversation. You must use:
+Analyst Report: <INSERT RAW JSON OR ABSOLUTE PATH TO FILE>
+Baseline Metrics: <INSERT RAW JSON OR ABSOLUTE PATH TO baseline/metrics.json>
+Experiment Config: <ABSOLUTE PATH TO experiment-config.json>
+
+REUSE the supplied experiment config file (do NOT create a new one). Run the
+candidate experiment, and then run the verification script. Return the raw JSON
+outputs. Do not interpret the verdict or alter target code. If the playbook
+cannot be read, stop and report that blocker.
 ```
 
 **Performance Repairer**
 
 ```text
 You are the Performance Repairer for an approved REPAIR phase. Before any work,
-read {skill_dir}/references/repairer-playbook.md in full. You may edit only the
-target repository files needed for the supplied evidence-backed suspect. Return
+read {skill_dir}/references/repairer-playbook.md in full.
+
+You have zero memory of the prior conversation. You must act ONLY on the following evidence:
+Analyst Report: <INSERT RAW JSON OR ABSOLUTE PATH TO FILE>
+Baseline Metrics: <INSERT RAW JSON OR ABSOLUTE PATH TO baseline/metrics.json>
+Verification Verdict (if this is a retry): <INSERT RAW JSON OR ABSOLUTE PATH TO verdict.json>
+
+You may edit only the target repository files needed for the supplied evidence-backed suspect. Return
 the minimal diff summary and affected tests; do not run or claim a verification
 verdict. If the playbook cannot be read, stop and report that blocker.
 ```
