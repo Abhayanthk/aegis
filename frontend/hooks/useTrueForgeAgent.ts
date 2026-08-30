@@ -24,6 +24,9 @@ export function useTrueForgeAgent(apiUrl: string = "http://localhost:3001/api/ch
     const reader = response.body.getReader();
     const decoder = new TextDecoder("utf-8");
     let buffer = "";
+    
+    let currentEventName = "";
+    let currentData = "";
 
     try {
       while (true) {
@@ -35,59 +38,66 @@ export function useTrueForgeAgent(apiUrl: string = "http://localhost:3001/api/ch
         const lines = buffer.split("\n");
         buffer = lines.pop() || "";
         
-        let currentEventName = "";
-
         for (const line of lines) {
-          if (line.startsWith("event: ")) {
-            currentEventName = line.slice(7).trim();
+          // Empty line indicates the end of an SSE event
+          if (line.trim() === "") {
+            if (currentEventName && currentData) {
+              try {
+                if (currentEventName === "error") {
+                   setAgentState("ERROR");
+                   try {
+                     const errData = JSON.parse(currentData);
+                     setError(errData.detail || errData.error || "Unknown Error");
+                   } catch {
+                     setError(currentData);
+                   }
+                } else if (currentEventName === "session") {
+                   const data = JSON.parse(currentData);
+                   setSessionId(data.sessionId);
+                } else if (currentEventName === "trueforge") {
+                   const data = JSON.parse(currentData);
+                   const tfEvent = data.event;
+                   
+                   if (tfEvent) {
+                     if (tfEvent.type === "step.run") {
+                       setCurrentStep(tfEvent.stepName || "Processing...");
+                     }
+                     
+                     if (tfEvent.reasoningContent) {
+                       setThoughts((prev) => prev + tfEvent.reasoningContent);
+                     } else if (tfEvent.content && typeof tfEvent.content === "string" && !tfEvent.type.includes("question")) {
+                       setThoughts((prev) => prev + tfEvent.content);
+                     }
+
+                     if (tfEvent.type === "model.tool_call" || tfEvent.type === "ask_question") {
+                       setQuestion({
+                         questionType: tfEvent.questionType || "text",
+                         message: tfEvent.message || tfEvent.content || "Agent needs input or approval",
+                         raw: tfEvent
+                       });
+                       setAgentState("AWAITING_INPUT");
+                     }
+                     
+                     if (tfEvent.type === "turn.complete") {
+                       setAgentState("COMPLETED");
+                     }
+                   }
+                }
+              } catch (err) {
+                console.warn("Failed to parse SSE JSON:", currentData, err);
+              }
+            }
+            
+            // Reset for the next event
+            currentEventName = "";
+            currentData = "";
             continue;
           }
           
-          if (line.startsWith("data: ")) {
-            const dataStr = line.slice(6).trim();
-            if (!dataStr) continue;
-            
-            try {
-              const data = JSON.parse(dataStr);
-              
-              if (currentEventName === "session") {
-                setSessionId(data.sessionId);
-              } else if (currentEventName === "trueforge") {
-                const tfEvent = data.event;
-                if (!tfEvent) continue;
-
-                // Handle step runs
-                if (tfEvent.type === "step.run") {
-                  setCurrentStep(tfEvent.stepName || "Processing...");
-                }
-                
-                // Handle streaming reasoning
-                if (tfEvent.reasoningContent) {
-                  setThoughts((prev) => prev + tfEvent.reasoningContent);
-                } else if (tfEvent.content && typeof tfEvent.content === "string" && !tfEvent.type.includes("question")) {
-                  setThoughts((prev) => prev + tfEvent.content);
-                }
-
-                // Handle tool requests (agent questions)
-                if (tfEvent.type === "model.tool_call" || tfEvent.type === "ask_question") {
-                  setQuestion({
-                    questionType: tfEvent.questionType || "text",
-                    message: tfEvent.message || tfEvent.content || "Agent needs input or approval",
-                    raw: tfEvent
-                  });
-                  setAgentState("AWAITING_INPUT");
-                }
-                
-                if (tfEvent.type === "turn.complete") {
-                  setAgentState("COMPLETED");
-                }
-              } else if (currentEventName === "error") {
-                setAgentState("ERROR");
-                setError(data.detail || data.error || "Unknown Error");
-              }
-            } catch (err) {
-              console.warn("Failed to parse SSE JSON:", dataStr, err);
-            }
+          if (line.startsWith("event: ")) {
+            currentEventName = line.slice(7).trim();
+          } else if (line.startsWith("data: ")) {
+            currentData += (currentData ? "\n" : "") + line.slice(6).trim();
           }
         }
       }
