@@ -1,164 +1,196 @@
-# AEGIS — Autonomous Runtime Reliability Agent
+<div align="center">
 
-AEGIS is an autonomous runtime-reliability agent built on [TrueForge](https://github.com/truefoundry/trueforge), an open-source agent harness. It detects, reproduces, and repairs **Node.js event-loop starvation** through a closed-loop pipeline:
+# AEGIS
+### Autonomous Runtime Reliability Agent
 
+**The problem:** Node.js is single-threaded. A single CPU-bound task (massive JSON parsing, regex evaluation, sync crypto) blocks the event loop. Health checks fail. Tail latency spikes. Pods restart.
+**The solution:** AEGIS. An autonomous agent that finds the bottleneck, reproduces the starvation under load, applies a targeted fix, and statistically proves the improvement before asking for a PR merge.
+
+<br/>
+
+[![Built on TrueForge](https://img.shields.io/badge/built%20on-TrueForge-6C4CF1?style=for-the-badge)](https://github.com/truefoundry/trueforge)
+[![Node](https://img.shields.io/badge/Node.js-%E2%89%A518-339933?style=for-the-badge&logo=node.js&logoColor=white)](https://nodejs.org)
+[![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org)
+[![Next.js](https://img.shields.io/badge/Next.js-000000?style=for-the-badge&logo=next.js&logoColor=white)](https://nextjs.org)
+[![Reviewed by Qodo](https://img.shields.io/badge/reviewed%20by-Qodo-00B3A4?style=for-the-badge)](https://www.qodo.ai)
+
+</div>
+
+---
+
+## Submission Links
+
+| Requirement | Link |
+| --- | --- |
+| Source code repository | https://github.com/Abhayanthk/aegis |
+| Demo video (~3 min) | **TODO: paste your video URL here** |
+| What it does + how it uses TrueForge | [Section Below](#how-it-uses-trueforge) |
+| Qodo Code Review Evidence | [Section below](#qodo-code-review-evidence) |
+| Blog post (optional prize) | **TODO: paste your blog post URL here** |
+
+---
+
+## The Pitch
+
+Most AI coding agents guess at performance bugs by reading code. **AEGIS proves them.** 
+
+It treats event-loop starvation like a Senior SRE:
+1. **Reproduce:** Spins up a controlled load experiment.
+2. **Measure:** Records hard data (p99 tail latency, event-loop delay).
+3. **Repair:** Injects a targeted fix (worker threads, chunking, caching).
+4. **Verify:** Re-runs the exact same load test to mathematically prove a >50% latency drop without breaking functional tests.
+
+**The golden rule:** The LLM reasons and orchestrates. Deterministic scripts measure. The verifier decides pass/fail. The LLM cannot hallucinate a victory.
+
+---
+
+## System Architecture
+
+```mermaid
+graph TD
+    classDef default fill:#1a1b26,stroke:#7aa2f7,stroke-width:1px,color:#c0caf5;
+    classDef metric fill:#f7768e,stroke:#fff,stroke-width:2px,color:#fff;
+    classDef agent fill:#9ece6a,stroke:#fff,stroke-width:1px,color:#1a1b26;
+    classDef human fill:#bb9af7,stroke:#fff,stroke-width:1px,color:#fff;
+    
+    Start((Trigger)) --> Analyze[Repository Analyst<br/>Finds Suspects]
+    Start --> Prepare[Runtime Profiler<br/>Provisions Sandbox]
+    
+    Analyze --> Baseline{Baseline Load Test}
+    Prepare --> Baseline
+    
+    Baseline -->|Measures p99 & Errors| Diagnose[Diagnose Root Cause]
+    
+    Diagnose --> Repair[Performance Repairer<br/>Applies Code Fix]
+    Repair --> Candidate{Candidate Load Test}
+    
+    Candidate -->|Passes Policy Thresholds| Verify[Human Verification]
+    Verify -->|Approved| PR(((Create PR)))
+    
+    class Analyze,Prepare,Repair agent;
+    class Baseline,Candidate metric;
+    class Verify,PR human;
 ```
-Reproduce → Measure → Diagnose → Repair → Reproduce → Verify → Approve → PR
+
+---
+
+## How It Uses TrueForge
+
+AEGIS relies on [TrueForge](https://github.com/truefoundry/trueforge) as its core agent harness and execution engine.
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant UI as Next.js Frontend
+    participant API as Backend (Express + SDK)
+    participant TF as TrueForge Engine
+    participant Sandbox as Daytona Sandbox
+
+    User->>UI: Start Investigation
+    UI->>API: POST /api/chat
+    API->>TF: Spawn Root Agent
+    TF->>Sandbox: Clone Repo & Init Environment
+    TF-->>API: Stream SSE Events (Live Logs)
+    API-->>UI: Real-Time UI Updates
+    
+    rect rgb(26, 27, 38)
+        Note over TF,Sandbox: Autonomous Closed Loop
+        TF->>Sandbox: Run baseline load test
+        Sandbox-->>TF: Metrics JSON
+        TF->>TF: Diagnose starvation
+        TF->>Sandbox: Apply repair patch
+        TF->>Sandbox: Run candidate load test
+        Sandbox-->>TF: Metrics JSON
+        TF->>TF: Verify against strict policy
+    end
+    
+    TF-->>API: Request Human Approval
+    API-->>UI: Display Diff & Verdict
+    User->>UI: Approve PR
 ```
 
-## Architecture
+### TrueForge Implementation Details:
+1. **Sandboxed Execution:** The agent ships as a self-contained TrueForge skill (`aegis-runtime-reliability`). TrueForge executes all target code safely inside an isolated Daytona sandbox, entirely detached from the host.
+2. **Subagent Delegation:** TrueForge enforces explicit memory boundaries between the *Repository Analyst*, *Runtime Profiler*, and *Performance Repairer* subagents. Because they share zero memory, context handoffs must be absolute—preventing LLM drift.
+3. **SDK Orchestration:** We use `@truefoundry/trueforge-sdk` in our backend to orchestrate the agent lifecycle, streaming progress directly to the frontend so a human can monitor the state machine and authorize GitHub writes.
 
-```
-Root Agent
-├── Repository Analyst   — static analysis of suspect code paths
-├── Runtime Profiler     — controlled experiments via deterministic scripts
-└── Performance Repairer — targeted code edits with verification guardrails
-```
+---
 
-**Core principle**: The LLM reasons and orchestrates; deterministic scripts (`run_experiment.mjs`, `verify.mjs`) do the measuring and own the verdict. The model never invents a metric or a pass/fail decision.
+## Verification Gates & Guardrails
 
-## Skill: `aegis-runtime-reliability`
+AEGIS is strictly governed by `config/verification-policy.json`. A candidate fix is **only** accepted if all gates pass:
 
-The skill is a self-contained directory that TrueForge clones into an isolated sandbox:
+| Metric | Requirement | Default Threshold |
+| --- | --- | --- |
+| **Event-loop p99** | Candidate/Baseline ratio | ≤ 0.25 (75%+ reduction) |
+| **Target p99** | Candidate/Baseline ratio | ≤ 0.50 (50%+ reduction) |
+| **Health Success Rate**| Absolute minimum | ≥ 0.99 |
+| **Error Rate** | Errors / Total | ≤ 0.01 |
+| **Functional Tests** | Pass Rate | 100% (No regressions allowed) |
 
-```
-aegis-runtime-reliability/
-├── SKILL.md                              # Lean router with state machine and guardrails
-├── config/
-│   └── verification-policy.json          # Gate thresholds and policy rules
-├── references/
-│   ├── analyst-playbook.md               # Static analysis guide for Repository Analyst
-│   ├── profiler-playbook.md              # Experiment execution guide for Runtime Profiler
-│   ├── repairer-playbook.md              # Repair decision tree for Performance Repairer
-│   ├── evidence-contract.md              # What constitutes valid evidence
-│   └── verification-contract.md          # Verifier semantics and verdict handling
-└── scripts/
-    ├── package.json                      # ESM, autocannon dep, node >=18
-    ├── run_experiment.mjs                # Measurement harness (8-step pipeline)
-    └── verify.mjs                        # Deterministic verdict engine
-```
+*If `verify.mjs` exits with a `FAILED` verdict, the LLM is forcibly blocked from overriding it. Max 3 repair attempts before escalation.*
 
-## Scripts
-
-### `run_experiment.mjs` — Measurement Harness
-
-Reproduces event-loop starvation under controlled load:
-
-1. Starts the target app and waits for readiness
-2. Optional warmup phase
-3. Starts independent health probe loop
-4. Enables event-loop delay monitoring (`perf_hooks`)
-5. Drives load with Autocannon
-6. Stops probes cleanly
-7. Runs functional tests separately
-8. Writes canonical metrics JSON
-
-```bash
-node scripts/run_experiment.mjs --config experiment.json --output baseline/metrics.json
-```
-
-**Exit 0** = metrics written. **Exit non-zero** = crashed, no output (never mistaken for results).
-
-### `verify.mjs` — Verdict Engine
-
-Compares baseline vs candidate metrics against the verification policy:
-
-```bash
-node scripts/verify.mjs --baseline baseline/metrics.json \
-                         --candidate candidate/metrics.json \
-                         --policy config/verification-policy.json \
-                         --output verdict.json
-```
-
-Verdicts: `VERIFIED` | `FAILED` | `RETRY` | `ESCALATE` | `INCOMPARABLE`
-
-**Exit 0** = verifier ran (read verdict from JSON). **Exit non-zero** = verifier crashed.
-
-## Verification Gates
-
-| Gate | Condition | Default Threshold |
-|------|-----------|-------------------|
-| Event Loop p99 | candidate/baseline ratio | ≤ 0.25 (75%+ reduction) |
-| Health Success Rate | absolute minimum | ≥ 0.99 |
-| Health p99 | absolute maximum | ≤ 100ms |
-| Target p99 | candidate/baseline ratio | ≤ 0.50 (50%+ reduction) |
-| Error Rate | errors/total | ≤ 0.01 |
-| Functional Tests | pass rate | = 1.0 |
-
-Thresholds are configurable via `config/verification-policy.json`.
-
-## Guardrails
-
-- Reproduction is mandatory — no diagnosis from static reading alone
-- Verifier owns the verdict — the model never overrides it
-- Max 3 repair attempts, then escalate with evidence
-- Functional regression fails the candidate regardless of latency improvement
-- Human approval required before any GitHub write operation
-- No automatic merge — PRs are opened for review
-- All execution in sandbox only — no secrets in the sandbox
-
-## User Decision Points
-
-AEGIS prepares its isolated sandbox, installs required project and harness
-dependencies, and derives a health-endpoint smoke check when a repository has no
-test suite without interrupting the user. It asks for approval only three times:
-
-1. After baseline metrics are captured, to continue to diagnosis.
-2. After it presents the evidence-backed repair proposal, to apply that change.
-3. After a VERIFIED baseline/candidate comparison, to create the branch, commit,
-   and pull request.
-
-Setup failures are reported with their exact error and stop the run; they are not
-presented as approval dialogs.
+---
 
 ## Getting Started
 
+**Prerequisites:** Node.js 18+, npm.
+
+### 1. The Backend (Orchestrator)
 ```bash
-cd aegis-runtime-reliability/scripts
+git clone https://github.com/Abhayanthk/aegis.git
+cd aegis/backend
+cp .env.example .env # Add TrueForge credentials
 npm install
+npm run dev
 ```
 
-Then configure an experiment JSON and run:
-
+### 2. The Frontend (Investigation UI)
 ```bash
-node run_experiment.mjs --config ../examples/experiment.json --output baseline/metrics.json
+cd ../frontend
+cp .env.example .env # Add Clerk keys & backend URL
+npm install
+npm run dev # Opens http://localhost:3000
 ```
+
+### 3. Run Standalone (Under the Hood)
+```bash
+cd ../aegis-runtime-reliability/scripts
+npm install
+
+# Reproduce the issue:
+node run_experiment.mjs --config ../examples/experiment.json --output baseline/metrics.json
+
+# Verify a fix:
+node verify.mjs \
+  --baseline baseline/metrics.json \
+  --candidate candidate/metrics.json \
+  --policy ../config/verification-policy.json \
+  --output verdict.json
+```
+
+---
 
 ## Qodo Code Review Evidence
 
-### Review Scope
+We enforce rigorous automated reviews using Qodo, initialized in [PR #1](https://github.com/Abhayanthk/aegis/pull/1) and active on every hackathon PR.
 
-This PR introduces the `aegis-runtime-reliability` TrueForge skill — a complete, runnable system for detecting and repairing Node.js event-loop starvation.
+**Spotlight PR:** [#14 - refactor: fix 9 inefficiencies from full skill audit](https://github.com/Abhayanthk/aegis/pull/14)
 
-### Key Design Decisions
+This core refactor extracted 163 lines of repair examples into `repair-patterns.md`, formalized subagent handoffs, and centralized verification thresholds. 
 
-1. **Scripts over prose**: The previous version had measurement and verification described only in markdown contracts with no runnable code. This version ships real, executable scripts (`run_experiment.mjs`, `verify.mjs`) that the agent calls — the LLM never computes metrics or verdicts.
+**What Qodo Surfaced (And How We Responded):**
+Following the summary, Qodo flagged two critical correctness bugs:
+1. **Unresolved Path Logic:** Qodo identified a `{skill_dir}` placeholder that was passed into a file read by a subagent where token substitution would silently fail, breaking our repair examples. **We applied Qodo's fix to use an explicitly resolvable path.**
+2. **Stale Thresholds:** Qodo caught a dangerous discrepancy: our failure diagnosis template claimed a 75% reduction target, while our policy strictly mandated a 50% reduction. This would have caused the agent to reject valid repairs. **We applied the fix to sync with the authoritative policy.**
 
-2. **Protocol hash for comparability**: Both baseline and candidate runs produce a SHA-256 hash of the experiment configuration. The verifier refuses to compare runs with different hashes (`INCOMPARABLE` verdict).
+We addressed 100% of Qodo's findings before merging in commit `1b62ce3`.
 
-3. **Strict exit code semantics**: `run_experiment.mjs` exits non-zero and writes NO output on failure, ensuring a crashed run can never be mistaken for results. `verify.mjs` exits 0 whenever it successfully runs (verdict is in JSON), so the agent can distinguish "verifier said FAIL" from "verifier crashed."
+*(For the complete, unedited review trail, view our [merged pull request history](https://github.com/Abhayanthk/aegis/pulls?q=is%3Apr+is%3Amerged)).*
 
-4. **Decision tree, not blanket rules**: The repairer playbook provides a structured decision tree (worker_threads vs chunking vs algorithmic fix vs caching vs async conversion) rather than prescribing a single approach.
+---
 
-5. **Evidence chain enforcement**: Every step from analysis to PR requires specific, verifiable evidence from the deterministic scripts. The evidence contract explicitly lists what is and isn't valid evidence.
-
-### Files for Review
-
-| File | Purpose | Lines |
-|------|---------|-------|
-| `SKILL.md` | Lean router — state machine, guardrails, script contracts | ~160 |
-| `scripts/run_experiment.mjs` | 8-step measurement harness | ~330 |
-| `scripts/verify.mjs` | Deterministic verdict engine | ~230 |
-| `config/verification-policy.json` | Gate thresholds and policy rules | ~55 |
-| `references/analyst-playbook.md` | Repository Analyst instructions | ~100 |
-| `references/profiler-playbook.md` | Runtime Profiler instructions | ~100 |
-| `references/repairer-playbook.md` | Performance Repairer decision tree | ~250 |
-| `references/evidence-contract.md` | Evidence validity definitions | ~130 |
-| `references/verification-contract.md` | Verifier semantics and verdicts | ~170 |
-
-### Testing
-
-The scripts can be validated by:
-1. `node scripts/verify.mjs --help` — exits with usage (no crash)
-2. Creating mock baseline/candidate JSON files and running `verify.mjs` against them
-3. Syntax validation: `node --check scripts/run_experiment.mjs && node --check scripts/verify.mjs`
+<div align="center">
+  <br/>
+  <i>Every fix is measured, not guessed. Built on TrueForge.</i>
+</div>
