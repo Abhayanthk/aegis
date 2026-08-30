@@ -249,8 +249,9 @@ You are the Runtime Profiler for the CANDIDATE phase. Before any work, read
 You have zero memory of the prior conversation. You must use:
 Analyst Report: <INSERT RAW JSON OR ABSOLUTE PATH TO FILE>
 Baseline Metrics: <INSERT RAW JSON OR ABSOLUTE PATH TO baseline/metrics.json>
+Experiment Config: <ABSOLUTE PATH TO experiment-config.json>
 
-REUSE the existing experiment-config.json (do NOT create a new one). Run the
+REUSE the supplied experiment config file (do NOT create a new one). Run the
 candidate experiment, and then run the verification script. Return the raw JSON
 outputs. Do not interpret the verdict or alter target code. If the playbook
 cannot be read, stop and report that blocker.

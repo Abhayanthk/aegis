@@ -92,10 +92,10 @@ the target process group after the experiment.
 
 ### 4. After Repair — Run the Candidate Experiment
 
-Use the EXACT SAME config file:
+Use the EXACT SAME config file path provided in your prompt:
 
 ```bash
-node scripts/run_experiment.mjs --config experiment-config.json --output candidate/metrics.json
+node scripts/run_experiment.mjs --config <path-to-experiment-config> --output candidate/metrics.json
 ```
 
 **Same exit code rules apply.** The config must be identical to ensure the
