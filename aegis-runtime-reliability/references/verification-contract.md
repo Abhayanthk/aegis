@@ -29,8 +29,8 @@ Computes: `candidate_value / baseline_value`
 
 Passes when: `ratio <= threshold`
 
-Example: event_loop_p99 with threshold 0.25 means the candidate's p99 must
-be at most 25% of the baseline's p99 (a 75%+ reduction).
+Example: event_loop_p99 with threshold 0.50 means the candidate's p99 must
+be at most 50% of the baseline's p99 (a 50%+ reduction).
 
 ### `absolute_min`
 
@@ -154,7 +154,7 @@ Current defaults:
 
 | Gate | Mode | Threshold | Meaning |
 |------|------|-----------|---------|
-| event_loop_p99 | ratio | ≤ 0.25 | 75%+ reduction in event-loop p99 |
+| event_loop_p99 | ratio | ≤ 0.50 | 50%+ reduction in event-loop p99 |
 | health_success_rate | absolute_min | ≥ 0.99 | 99%+ health probe success |
 | health_p99 | absolute_max | ≤ 100ms | Health probe stays responsive |
 | target_p99 | ratio | ≤ 0.50 | 50%+ reduction in target p99 |

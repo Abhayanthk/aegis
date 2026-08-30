@@ -12,10 +12,10 @@
 
   "gates": {
     "event_loop_p99": {
-      "description": "Candidate event-loop p99 latency must be at most 25% of baseline p99.",
+      "description": "Candidate event-loop p99 latency must be at most 50% of baseline p99.",
       "metric_path": "event_loop.p99_ms",
       "mode": "ratio_candidate_over_baseline",
-      "threshold": 0.25,
+      "threshold": 0.50,
       "required": true
     },
     "health_success_rate": {

@@ -30,8 +30,8 @@ act on it.
 ```
 Root Agent (you)
 ├── Repository Analyst — static analysis and experiment inputs
-├── Runtime Profiler — harness configuration and raw measurements
-└── Performance Repairer — the smallest evidence-backed code change
+├── Runtime Profiler — harness configuration, experiment config, and raw measurements
+└── Performance Repairer — evidence-backed code changes
 ```
 
 ### Delegation is an execution requirement
@@ -82,13 +82,15 @@ outside the sandbox. Never put secrets in the sandbox.
 
 1. Resolve the skill directory and playbook paths to absolute paths.
 2. Start the Repository Analyst and the Profiler preparation lanes in parallel.
-3. The Profiler runs exactly one environment preflight: `node --version`,
-   `npm --version`, then one harness install attempt from `scripts/` when Node
-   is available. If any prerequisite is unavailable, report the exact error and
-   stop that lane; do not install a runtime with an operating-system package
-   manager during profiling.
-4. Wait for the Analyst's structured report, then select the target endpoint,
-   health endpoint, payload, package manager, and real functional command.
+3. The Profiler runs the environment preflight and automatically prepares the
+   isolated sandbox: install a supported Node.js runtime when needed, then
+   install target and harness dependencies once using their lockfiles. Never
+   ask the user to approve this sandbox-only setup. If setup fails, report the
+   exact error and stop because a baseline cannot be produced.
+4. Wait for the Analyst's structured report, then the Profiler creates the
+   experiment config using the Analyst's endpoint details. The **Profiler owns
+   the experiment config**; config schema and load profile defaults are in
+   `references/profiler-playbook.md`.
 5. Run one baseline. Only after the baseline succeeds, present the required
    evidence and wait for explicit human approval before any target-code edit.
 
@@ -109,25 +111,31 @@ REPRODUCE ──→ Run baseline experiment (scripts/run_experiment.mjs)
 │            MUST succeed (exit 0) before proceeding
 │            If exit != 0: fix config and retry, do NOT guess metrics
  ▼
-BASELINE REVIEW ──→ Present baseline evidence and ask for approval to repair
- │                  Wait for an explicit human "proceed" before editing code
+BASELINE REVIEW ──→ Present baseline evidence and ask to continue to diagnosis
+ │                  Wait for explicit human approval before diagnosis
  │                  If declined: stop and retain the baseline evidence
  ▼
 DIAGNOSE ──→ Interpret approved baseline metrics to identify root cause
- │            Read the JSON output — never fabricate numbers
+ │            Produce the smallest evidence-backed repair proposal
+ ▼
+REPAIR REVIEW ──→ Present the proposed code change and ask to apply it
+ │                 Wait for explicit human approval before any code edit
  ▼
 REPAIR ──→ Delegate to Performance Repairer (max 3 attempts)
  │          Repairer edits code, then Profiler re-runs experiment
  │          verify.mjs compares candidate vs baseline
  │          │
- │          ├─ VERIFIED → proceed to APPROVE
- │          ├─ FAILED   → Repairer tries again (up to max_repair_attempts)
+ │          ├─ VERIFIED → Ask human: "The candidate passed verification. Do you want to try and repair further?"
+ │          │             (Yes → loop back to REPAIR, No → proceed to PR REVIEW)
+ │          ├─ FAILED   → Ask human: "The candidate failed verification but may have improved. Is this valuation good enough?"
+ │          │             (Yes → loop back to REPAIR for more fixes, No → proceed to PR REVIEW)
  │          ├─ RETRY    → Re-run experiment (transient issue)
  │          ├─ INCOMPARABLE → Fix protocol mismatch, re-run
  │          └─ ESCALATE → Stop, report evidence to human
  ▼
-APPROVE ──→ Present verdict + evidence to human for approval
- │           human_approval_required_before_github_write = true
+PR REVIEW ──→ Present baseline/candidate comparison and VERIFIED verdict
+ │            Ask approval to create the branch, commit, and pull request
+ │            human_approval_required_before_github_write = true
  ▼
 PR ──→ Commit changes and open a pull request
        automatic_merge = false
@@ -135,19 +143,37 @@ PR ──→ Commit changes and open a pull request
 
 ### Baseline approval gate
 
-After a successful baseline and before any code edit, report the harness values
+After a successful baseline and before diagnosis, report the harness values
 that establish the baseline: event-loop p99, health success rate and p99,
 target p99, target error count, and functional-test result. Then ask exactly
 what action to take, for example:
 
 > Baseline captured: event-loop p99 is `<value> ms`; health is `<success>%`
 > successful with p99 `<value> ms`; target p99 is `<value> ms`; functional
-> tests are `<passed>` passed and `<failed>` failed. Should I proceed with the
-> smallest repair and run the candidate verification?
+> tests are `<passed>` passed and `<failed>` failed. Should I continue to
+> diagnose the cause and prepare the smallest repair proposal?
 
 Do not diagnose in detail, delegate the Repairer, edit target code, or run a
-candidate experiment until the human explicitly approves. This approval permits
-the repair-and-verification loop only; GitHub writes still need separate approval.
+candidate experiment until the human explicitly approves.
+
+### Repair approval gate
+
+After approved diagnosis and before a target-code edit, present the root cause,
+the exact files/functions to change, and the expected behavior preserved by the
+repair. Ask for approval to apply that specific repair and run the candidate
+experiment. Do not edit code before approval. This is the second user decision.
+
+### Pull request approval gate
+
+Only after `verify.mjs` returns `VERIFIED`, present the baseline and candidate
+values side by side with the verifier's raw verdict. Ask whether to create the
+branch, commit, and pull request. Do not make GitHub writes before approval.
+This is the third and final user decision.
+
+Do not ask for approval to provision the isolated sandbox, install project or
+harness dependencies, choose a smoke check, or retry a bounded setup step. On a
+blocking setup or measurement failure, report the exact error and stop without
+turning it into an approval question.
 
 ---
 
@@ -165,6 +191,9 @@ playbook before delegating that role. Do not load all playbooks into every role.
 Evidence and verification contracts are in:
 - `references/evidence-contract.md`
 - `references/verification-contract.md`
+
+Verification thresholds are in `config/verification-policy.json`. Do not
+hard-code thresholds in prompts; the verifier reads them at runtime.
 
 ### Required prompt shape
 
@@ -187,10 +216,11 @@ when none exists). If the playbook cannot be read, stop and report that blocker.
 ```text
 You are the Runtime Profiler in the preparation phase. Before any work, read
 {skill_dir}/references/profiler-playbook.md in full. Run only the documented
-Node/npm preflight and one local harness dependency install attempt. Do not run
-the target application, install Node, use an OS package manager, or create an
-experiment config until the Analyst artifact is supplied. Return the required
-raw JSON result. If the playbook cannot be read, stop and report that blocker.
+Node/npm preflight and automatic sandbox setup. You may provision Node >=18 and
+install target and local harness dependencies inside the sandbox; do not modify
+the host or install global packages. Do not run the target application or create
+an experiment config until the Analyst artifact is supplied. Return the required
+raw JSON result. If setup fails, report the error without asking the user.
 ```
 
 **Runtime Profiler experiment**
@@ -267,14 +297,14 @@ node scripts/verify.mjs --baseline <baseline/metrics.json> \
 
 ## Guardrails (NON-NEGOTIABLE)
 
-1. **Reproduction is mandatory.** Never diagnose from static reading alone.
-   You must have a successful baseline experiment before attempting repair.
-
-2. **Verifier owns the verdict.** Never override, reinterpret, or skip
+1. **Verifier owns the verdict.** Never override, reinterpret, or skip
    `verify.mjs`. If it says FAILED, the candidate failed — period.
 
-3. **Never fabricate a measurement.** If `run_experiment.mjs` crashes,
+2. **Never fabricate a measurement.** If `run_experiment.mjs` crashes,
    fix the config and re-run. Do not invent metrics.
+
+3. **Sandbox only.** Execute repository code only in the Daytona sandbox.
+   Never run it on the host. Never put secrets in the sandbox.
 
 4. **Functional regression fails the candidate.** Even if latency improved
    dramatically, a single functional test failure means the candidate is
@@ -283,116 +313,22 @@ node scripts/verify.mjs --baseline <baseline/metrics.json> \
 5. **Max 3 repair attempts, then escalate.** After 3 failed attempts,
    stop and present all evidence to the human. Do not keep trying.
 
-6. **Sandbox only.** Execute repository code only in the Daytona sandbox.
-   Never run it on the host. Never put secrets in the sandbox.
-
-7. **Separate reads from writes.** Use GitHub read tools freely. Use
-   write tools (branch, commit, PR) only after human approval.
-
-8. **No auto-merge.** `automatic_merge = false` in policy. PRs are
-   opened for human review.
-
-9. **Narrowly scoped changes.** Each repair should touch the minimum
+6. **Narrowly scoped changes.** Each repair should touch the minimum
    code necessary. No drive-by refactors.
 
-10. **Every change is evidence-backed.** Every claim must cite the
-    specific metrics from the experiment output.
+7. **Every change is evidence-backed.** Every claim must cite the
+   specific metrics from the experiment output.
 
-11. **Minimize exploratory tool use.** Batch independent reads, use `rg` to
-    locate code and package metadata, and inspect the exact files returned.
-    Do not repeatedly re-read files, re-install dependencies, or probe the same
-    endpoint manually after the harness has produced evidence.
+8. **Minimize exploratory tool use.** Batch independent reads, use `rg` to
+   locate code and package metadata, and inspect the exact files returned.
+   Do not repeatedly re-read files, re-install dependencies, or probe the same
+   endpoint manually after the harness has produced evidence.
 
-12. **One bounded diagnosis loop.** Build the config once from the Analyst's
-    report; on a harness failure, make one config/environment correction per
-    retry and report the concrete error. After two setup failures, escalate
-    rather than cycling through guesses.
+9. **One bounded diagnosis loop.** Build the config once from the Analyst's
+   report; on a harness failure, make one config/environment correction per
+   retry and report the concrete error. After two setup failures, escalate
+   rather than cycling through guesses.
 
-13. **No unverified completion claim.** State `VERIFIED` only after the
+10. **No unverified completion claim.** State `VERIFIED` only after the
     candidate metrics and verdict JSON both exist. Report raw values, not
     informal benchmark summaries, to the user.
-
-14. **Baseline approval is mandatory.** A successful baseline is evidence, not
-    authorization to edit. Wait for explicit approval before entering
-    DIAGNOSE or REPAIR.
-
-15. **No fake functional pass.** `functional_test_command` must execute the
-    repository's real test suite or a documented, meaningful repo-local smoke
-    check. Never use `exit 0`, `true`, `:`, an empty command, or output-only
-    commands. When no meaningful test or smoke command exists, stop and ask the
-    human to approve adding coverage before repair.
-
-16. **No runtime provisioning during profiling.** If Node or the harness
-    dependency install is unavailable, report the exact preflight error. Do not
-    run `apt`, `brew`, `yum`, `dnf`, `apk`, `nvm`, `asdf`, or a global npm
-    install in the experiment phase.
-
----
-
-## Load profile — concrete defaults (configurable inputs, IDENTICAL for baseline and candidate)
-
-The Runtime Profiler supplies these; document these defaults in run_experiment.mjs:
-- Autocannon: connections (virtual users) = 50, duration = 20s, pipelining = 1
-- Warmup: 3s before measurement starts
-- Independent health probe: one GET to the Analyst-reported health endpoint
-  (normally `/health`) every 500ms for the full duration
-- Event-loop sampling resolution: 20ms
-
-These are INPUTS, not hard-coded constants — but baseline and candidate MUST use
-the exact same values. That identity is precisely what protocol_hash captures. If
-a target needs heavier load to starve, raise connections; NEVER change the numbers
-between baseline and candidate, or the comparison is invalid.
-
-Create an experiment config JSON matching this schema before running:
-
-```json
-{
-  "start_command": "node server.js",
-  "target_endpoint": "http://localhost:3000/api/heavy-computation",
-  "request_method": "POST",
-  "request_payload": { "size": 10000 },
-  "duration_seconds": 20,
-  "connections": 50,
-  "rate": 0,
-  "pipelining": 1,
-  "health_probe_path": "http://localhost:3000/health",
-  "health_probe_interval_ms": 500,
-  "functional_test_command": "node --test test/",
-  "warmup_seconds": 3,
-  "startup_timeout_ms": 30000,
-  "event_loop_resolution_ms": 20
-}
-```
-
-Use the SAME config file for both baseline and candidate runs.
-
-Select `target_endpoint` from the Analyst's highest-confidence, externally
-reachable suspect. Prefer a read-only endpoint when it exercises the failure;
-otherwise use the smallest payload that reliably triggers the suspect path.
-Set `health_probe_path` to the independent lightweight endpoint reported by the
-Analyst, not a guessed `/healthz` route. Set `functional_test_command` to the
-reported real test command. If the repository has no suite, use a documented
-repo-local smoke command that makes a meaningful request to the running app; a
-no-op command is invalid and the harness rejects it.
-
-For a nested target repository, keep the process foregrounded in the config,
-for example: `"start_command": "cd nodetest && node src/server.js"`. The
-harness invokes that command and cleans it up; do not execute this command
-yourself first.
-
----
-
-## Quick Reference: Verification Policy
-
-Thresholds are in `config/verification-policy.json` (configurable, not
-hard-coded). Current defaults:
-
-| Gate               | Condition                           | Threshold |
-|--------------------|-------------------------------------|-----------|
-| event_loop_p99     | candidate.p99 / baseline.p99        | ≤ 0.25    |
-| health_success     | success_rate during load             | ≥ 0.99    |
-| health_p99         | health probe p99 response time       | ≤ 100 ms  |
-| target_p99         | candidate.p99 / baseline.p99        | ≤ 0.50    |
-| target_error_rate  | errors / total requests              | ≤ 0.01    |
-| functional_pass    | pass_rate                            | = 1.0     |
-| functional_zero_fail | failed count                       | = 0       |

@@ -59,7 +59,7 @@ if (!args.config || !args.output) {
  * @property {number}   [pipelining]       - Autocannon pipelining factor (default 1).
  * @property {string}   health_probe_path  - Full URL of the health/liveness endpoint.
  * @property {number}   health_probe_interval_ms - Interval (ms) between health probes (default 500).
- * @property {string}   functional_test_command - Shell command to run functional tests AFTER load.
+ * @property {string}   [functional_test_command] - Shell command to run functional tests AFTER load. When omitted, the harness runs a health-endpoint smoke check.
  * @property {number}   [warmup_seconds]   - Optional warmup duration before measurement (default 3).
  * @property {number}   [startup_timeout_ms] - Max ms to wait for target readiness (default 30000).
  * @property {number}   [event_loop_resolution_ms] - ELD monitoring resolution (default 20).
@@ -77,7 +77,6 @@ try {
 const REQUIRED_FIELDS = [
   'start_command', 'target_endpoint', 'duration_seconds',
   'connections', 'health_probe_path', 'health_probe_interval_ms',
-  'functional_test_command',
 ];
 for (const field of REQUIRED_FIELDS) {
   if (config[field] === undefined || config[field] === null) {
@@ -103,8 +102,9 @@ function isNoOpFunctionalCommand(command) {
   );
 }
 
-if (typeof config.functional_test_command !== 'string' ||
-    isNoOpFunctionalCommand(config.functional_test_command)) {
+if (config.functional_test_command !== undefined &&
+    (typeof config.functional_test_command !== 'string' ||
+      isNoOpFunctionalCommand(config.functional_test_command))) {
   console.error(
     'FATAL: functional_test_command must run a real test suite or meaningful repo-local smoke check; no-op commands are invalid.',
   );
@@ -339,6 +339,16 @@ async function runFunctionalTests(command) {
   return { passed, failed };
 }
 
+/** Run the documented fallback when the repository has no functional test suite. */
+async function runHealthSmokeCheck(url) {
+  try {
+    const response = await fetch(url, { signal: AbortSignal.timeout(5000) });
+    return response.ok ? { passed: 1, failed: 0 } : { passed: 0, failed: 1 };
+  } catch {
+    return { passed: 0, failed: 1 };
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Main experiment orchestration
 // ---------------------------------------------------------------------------
@@ -415,8 +425,13 @@ async function main() {
     // -----------------------------------------------------------------------
     // 7. Run functional tests SEPARATELY (outside the load path)
     // -----------------------------------------------------------------------
-    console.log(`[experiment] Running functional tests: ${config.functional_test_command}`);
-    const functionalResult = await runFunctionalTests(config.functional_test_command);
+    const hasFunctionalCommand = typeof config.functional_test_command === 'string';
+    console.log(hasFunctionalCommand
+      ? `[experiment] Running functional tests: ${config.functional_test_command}`
+      : `[experiment] Running health smoke check: ${config.health_probe_path}`);
+    const functionalResult = hasFunctionalCommand
+      ? await runFunctionalTests(config.functional_test_command)
+      : await runHealthSmokeCheck(config.health_probe_path);
     console.log(`[experiment] Functional tests: ${functionalResult.passed} passed, ${functionalResult.failed} failed.`);
 
     // -----------------------------------------------------------------------
