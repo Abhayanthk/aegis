@@ -10,7 +10,7 @@ export interface AgentQuestion {
   raw?: any;
 }
 
-export function useTrueForgeAgent(apiUrl: string = "http://localhost:3001/api/chat") {
+export function useTrueForgeAgent(apiUrl: string = "/api/chat") {
   const [agentState, setAgentState] = useState<AgentState>("IDLE");
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [currentStep, setCurrentStep] = useState<string>("");
