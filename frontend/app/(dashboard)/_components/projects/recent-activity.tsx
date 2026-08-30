@@ -1,5 +1,4 @@
 import { CheckCircle2, CircleDashed, XCircle } from "lucide-react";
-import { cn } from "@/lib/utils";
 
 export interface ActivityItem {
   id: string;

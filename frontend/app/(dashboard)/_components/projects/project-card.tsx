@@ -1,6 +1,9 @@
+"use client";
+
 import { cn } from "@/lib/utils";
 import { Check, Ellipsis } from "lucide-react";
 import Link from "next/link";
+import { Menu, MenuTrigger, MenuPopup, MenuItem, MenuSeparator } from "@/components/ui/menu";
 
 export interface ProjectMetric {
   label: string;
@@ -50,7 +53,7 @@ export function ProjectCard({ project }: ProjectCardProps) {
 
   return (
     <Link href={targetUrl} className="group block h-[200px]">
-      <div className="flex flex-col h-full rounded-[8px] border border-[var(--ds-hairline)] bg-[var(--ds-surface-1)]/40 p-5 transition-colors duration-200 hover:bg-[var(--ds-surface-1)]">
+      <div className="flex flex-col h-full rounded-[var(--ds-rounded-xl)] border border-[var(--ds-hairline)] bg-[var(--ds-surface-1)]/40 p-5 transition-colors duration-200 hover:bg-[var(--ds-surface-1)]">
         {/* Top Header */}
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-2">
@@ -59,7 +62,17 @@ export function ProjectCard({ project }: ProjectCardProps) {
               {project.name}
             </h3>
           </div>
-          <Ellipsis className="h-4 w-4 text-[var(--ds-ink-tertiary)]" />
+          <Menu>
+            <MenuTrigger className="p-1 rounded-[var(--ds-rounded-xs)] text-[var(--ds-ink-tertiary)] hover:text-[var(--ds-ink)] hover:bg-[var(--ds-surface-2)] transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[var(--ds-primary)]/40" onClick={(e) => e.preventDefault()}>
+              <Ellipsis className="h-4 w-4" />
+            </MenuTrigger>
+            <MenuPopup align="end" sideOffset={4} className="min-w-[140px]" onClick={(e) => e.preventDefault()}>
+              <MenuItem className="text-[12px] cursor-pointer">View settings</MenuItem>
+              <MenuItem className="text-[12px] cursor-pointer">Pause scanning</MenuItem>
+              <MenuSeparator />
+              <MenuItem className="text-[12px] text-red-500 hover:text-red-600 focus:text-red-600 cursor-pointer">Delete project</MenuItem>
+            </MenuPopup>
+          </Menu>
         </div>
 
         {/* Repo & Branch */}
