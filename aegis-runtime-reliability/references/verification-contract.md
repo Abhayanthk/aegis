@@ -150,17 +150,9 @@ prevents accidental comparison of experiments run under different conditions.
 All thresholds live in `config/verification-policy.json`. They are NOT
 hard-coded in prompts, SKILL.md, or the scripts themselves.
 
-Current defaults:
-
-| Gate | Mode | Threshold | Meaning |
-|------|------|-----------|---------|
-| event_loop_p99 | ratio | ≤ 0.50 | 50%+ reduction in event-loop p99 |
-| health_success_rate | absolute_min | ≥ 0.99 | 99%+ health probe success |
-| health_p99 | absolute_max | ≤ 100ms | Health probe stays responsive |
-| target_p99 | ratio | ≤ 0.50 | 50%+ reduction in target p99 |
-| target_error_rate | error_rate | ≤ 0.01 | <1% error rate |
-| functional_pass_rate | functional | ≥ 1.0 | 100% functional test pass |
-| functional_zero_failures | absolute_max | ≤ 0 | Zero test failures |
+Read `config/verification-policy.json` for the authoritative, current threshold
+values. Do not rely on any threshold values written in this document or in
+prompts — the policy file is the single source of truth.
 
 To adjust thresholds for a specific engagement, edit the policy file BEFORE
 running experiments. Do not change thresholds mid-engagement.
@@ -172,11 +164,11 @@ running experiments. Do not change thresholds mid-engagement.
 When a verdict is FAILED, the agent should structure its analysis as:
 
 ```
-## Verification Result: FAILED
+## Verification Result: FAILED (illustrative example — read policy file for actual thresholds)
 
 ### Failed Gates
-- event_loop_p99: ratio 0.85 (threshold ≤0.25)
-  Baseline: 4217ms → Candidate: 3584ms (15% improvement, need 75%+)
+- event_loop_p99: ratio 0.85 (threshold ≤ <value from policy>)
+  Baseline: 4217ms → Candidate: 3584ms (15% improvement, need more)
 
 ### Passing Gates
 - health_success_rate: 0.997 (threshold ≥0.99) ✓

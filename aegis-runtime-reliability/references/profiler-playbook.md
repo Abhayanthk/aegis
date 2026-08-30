@@ -10,7 +10,11 @@ You do NOT interpret pass/fail — that is the verifier's job.
 
 ### 1. Prepare the Experiment Configuration
 
-Using the Repository Analyst's findings, create an experiment config JSON:
+Using the Repository Analyst's findings, create an experiment config JSON.
+
+> **Phase guard:** This section applies only to the BASELINE phase. In the
+> CANDIDATE phase, reuse the config file path supplied in your prompt; do not
+> create or overwrite it.
 
 ```json
 {
@@ -92,11 +96,14 @@ the target process group after the experiment.
 
 ### 4. After Repair — Run the Candidate Experiment
 
-Use the EXACT SAME config file path provided in your prompt:
+Use the EXACT SAME config file path supplied in your prompt:
 
 ```bash
 node scripts/run_experiment.mjs --config <path-to-experiment-config> --output candidate/metrics.json
 ```
+
+> **Do NOT create a new config.** If the config is missing at the supplied path,
+> stop and report the error.
 
 **Same exit code rules apply.** The config must be identical to ensure the
 `protocol_hash` matches.
