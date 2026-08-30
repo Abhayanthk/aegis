@@ -109,8 +109,12 @@ IDLE
 ANALYZE ──→ Delegate to Repository Analyst
  │          Read repo, find entry points, and identify suspect bottlenecks.
  ▼
-BASELINE ──→ Delegate to Runtime Profiler (Preparation + Baseline phases)
- │           Set up sandbox, run load test, and generate baseline metrics.
+PREPARE ──→ Delegate to Runtime Profiler (Preparation phase)
+ │          Set up sandbox, install Node/npm, and install dependencies.
+ │          Do not run experiments. MUST succeed before proceeding.
+ ▼
+BASELINE ──→ Delegate to Runtime Profiler (Baseline phase)
+ │           Create config, run load test, and generate baseline metrics.
  │           MUST succeed (exit 0) before proceeding.
  ▼
 DIAGNOSE ──→ Interpret baseline metrics to identify root cause
