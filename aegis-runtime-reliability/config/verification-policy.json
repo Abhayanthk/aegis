@@ -1,0 +1,64 @@
+{
+  "version": "1.0.0",
+  "description": "Verification policy for AEGIS runtime-reliability skill. Thresholds and rules consumed by scripts/verify.mjs.",
+
+  "rules": {
+    "same_protocol_hash_required": true,
+    "verifier_is_source_of_truth": true,
+    "human_approval_required_before_github_write": true,
+    "automatic_merge": false,
+    "max_repair_attempts": 3
+  },
+
+  "gates": {
+    "event_loop_p99": {
+      "description": "Candidate event-loop p99 latency must be at most 50% of baseline p99.",
+      "metric_path": "event_loop.p99_ms",
+      "mode": "ratio_candidate_over_baseline",
+      "threshold": 0.50,
+      "required": true
+    },
+    "health_success_rate": {
+      "description": "Health probe success rate must be >= 99% during load.",
+      "metric_path": "health.success_rate",
+      "mode": "absolute_min",
+      "threshold": 0.99,
+      "required": true
+    },
+    "health_p99": {
+      "description": "Health probe p99 response time must be <= 100 ms.",
+      "metric_path": "health.p99_ms",
+      "mode": "absolute_max",
+      "threshold": 100,
+      "required": true
+    },
+    "target_p99": {
+      "description": "Candidate target endpoint p99 must be at most 50% of baseline p99.",
+      "metric_path": "target.p99_ms",
+      "mode": "ratio_candidate_over_baseline",
+      "threshold": 0.50,
+      "required": true
+    },
+    "target_error_rate": {
+      "description": "Target endpoint error rate must be <= 1%.",
+      "metric_path": "target.errors",
+      "mode": "error_rate",
+      "threshold": 0.01,
+      "required": true
+    },
+    "functional_pass_rate": {
+      "description": "All functional tests must pass (pass_rate == 1.0).",
+      "metric_path": "functional.passed",
+      "mode": "functional_all_pass",
+      "threshold": 1.0,
+      "required": true
+    },
+    "functional_zero_failures": {
+      "description": "Functional test failures must be exactly zero.",
+      "metric_path": "functional.failed",
+      "mode": "absolute_max",
+      "threshold": 0,
+      "required": true
+    }
+  }
+}
