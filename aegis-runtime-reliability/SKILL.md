@@ -105,13 +105,15 @@ Every engagement follows this sequence. Do NOT skip steps.
 ```
 IDLE
  │
- ▼
-ANALYZE ──→ Delegate to Repository Analyst
- │          Read repo, find entry points, and identify suspect bottlenecks.
- ▼
-PREPARE ──→ Delegate to Runtime Profiler (Preparation phase)
- │          Set up sandbox, install Node/npm, and install dependencies.
- │          Do not run experiments. MUST succeed before proceeding.
+ ├─► ANALYZE ──→ Delegate to Repository Analyst
+ │               Read repo, find entry points, and identify suspect bottlenecks.
+ │
+ └─► PREPARE ──→ Delegate to Runtime Profiler (Preparation phase)
+                 Set up sandbox, install Node/npm, and install dependencies.
+                 Do not run experiments. MUST succeed before proceeding.
+
+ (Wait for BOTH ANALYZE and PREPARE to complete)
+ │
  ▼
 BASELINE ──→ Delegate to Runtime Profiler (Baseline phase)
  │           Create config, run load test, and generate baseline metrics.
