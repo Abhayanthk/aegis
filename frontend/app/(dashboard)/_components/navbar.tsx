@@ -1,32 +1,30 @@
 "use client";
 
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
 import {
-  Bell,
   ChevronRight,
-  Download,
-  LayoutGrid,
   Pause,
-  Pencil,
   Play,
   Plus,
   Search,
-  Share2,
   X,
-  Zap,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
 import { useInvestigationControls } from "@/app/(investigation)/_components/investigation-context";
-import { SignInButton, SignUpButton, Show, UserButton } from "@clerk/nextjs";
-
-const toolbarActions = [
-  { icon: Pencil, label: "Edit" },
-  { icon: Download, label: "Export" },
-  { icon: Zap, label: "Actions" },
-] as const;
+import {
+  CommandDialog,
+  CommandDialogPopup,
+  Command,
+  CommandInput,
+  CommandList,
+  CommandEmpty,
+  CommandGroup,
+  CommandGroupLabel,
+  CommandItem,
+} from "@/components/ui/command";
 
 // Map route segments to readable titles
 const routeTitles: Record<string, string> = {
@@ -40,7 +38,22 @@ const routeTitles: Record<string, string> = {
 
 export function Navbar() {
   const pathname = usePathname();
+  const router = useRouter();
   const controls = useInvestigationControls();
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [isMac, setIsMac] = useState(true);
+
+  useEffect(() => {
+    setIsMac(typeof navigator !== 'undefined' && navigator.platform.toUpperCase().indexOf('MAC') >= 0);
+    const down = (e: KeyboardEvent) => {
+      if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        setSearchOpen((open) => !open);
+      }
+    };
+    document.addEventListener("keydown", down);
+    return () => document.removeEventListener("keydown", down);
+  }, []);
 
   // Build breadcrumb from pathname
   const segments = pathname.split("/").filter(Boolean);
@@ -107,28 +120,6 @@ export function Navbar() {
         {breadcrumbContent}
       </div>
 
-      {/* Center: toolbar actions (hidden during investigation for minimal focus) */}
-      {!isInvestigation && (
-        <div className="ml-8 flex items-center gap-0.5">
-          {toolbarActions.map(({ icon: Icon, label }) => (
-            <Tooltip key={label}>
-              <TooltipTrigger
-                render={
-                  <button
-                    type="button"
-                    aria-label={label}
-                    className="flex h-7 w-7 items-center justify-center rounded-[var(--ds-rounded-md)] text-[var(--ds-ink-subtle)] transition-colors duration-150 hover:bg-[var(--ds-surface-3)] hover:text-[var(--ds-ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ds-primary)]/40"
-                  />
-                }
-              >
-                <Icon className="h-3.5 w-3.5" />
-              </TooltipTrigger>
-              <TooltipPopup>{label}</TooltipPopup>
-            </Tooltip>
-          ))}
-        </div>
-      )}
-
       {/* Spacer */}
       <div className="flex-1" />
 
@@ -177,6 +168,7 @@ export function Navbar() {
                 render={
                   <button
                     type="button"
+                    onClick={() => setSearchOpen(true)}
                     aria-label="Search"
                     className="flex h-7 w-7 items-center justify-center rounded-[var(--ds-rounded-md)] text-[var(--ds-ink-subtle)] transition-colors duration-150 hover:bg-[var(--ds-surface-3)] hover:text-[var(--ds-ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ds-primary)]/40"
                   />
@@ -184,74 +176,42 @@ export function Navbar() {
               >
                 <Search className="h-3.5 w-3.5" />
               </TooltipTrigger>
-              <TooltipPopup>Search</TooltipPopup>
+              <TooltipPopup>
+                Search <kbd className="ml-1 inline-flex h-4 items-center gap-1 rounded-[var(--ds-rounded-xs)] border border-[var(--ds-hairline)] bg-[var(--ds-surface-1)] px-1 font-mono text-[10px] font-medium text-[var(--ds-ink-subtle)]">
+                  <span className="text-[10px]">{isMac ? '⌘' : 'Ctrl+'}</span>K
+                </kbd>
+              </TooltipPopup>
             </Tooltip>
 
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  <button
-                    type="button"
-                    aria-label="Notifications"
-                    className="flex h-7 w-7 items-center justify-center rounded-[var(--ds-rounded-md)] text-[var(--ds-ink-subtle)] transition-colors duration-150 hover:bg-[var(--ds-surface-3)] hover:text-[var(--ds-ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ds-primary)]/40"
-                  />
-                }
-              >
-                <Bell className="h-3.5 w-3.5" />
-              </TooltipTrigger>
-              <TooltipPopup>Notifications</TooltipPopup>
-            </Tooltip>
-
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 gap-1.5 px-2.5 text-[12px] font-medium text-[var(--ds-ink-subtle)] hover:bg-[var(--ds-surface-3)] hover:text-[var(--ds-ink)]"
-            >
-              <Share2 className="h-3 w-3" />
-              Share
-            </Button>
+            <CommandDialog open={searchOpen} onOpenChange={setSearchOpen}>
+              <CommandDialogPopup>
+                <Command>
+                  <CommandInput placeholder="Type a command or search..." />
+                  <CommandList>
+                    <CommandEmpty>No results found.</CommandEmpty>
+                    <CommandGroup>
+                      <CommandGroupLabel>Navigation</CommandGroupLabel>
+                      <CommandItem onSelect={() => { router.push('/projects'); setSearchOpen(false); }}>Projects</CommandItem>
+                      <CommandItem onSelect={() => { router.push('/pull-requests'); setSearchOpen(false); }}>Pull Requests</CommandItem>
+                      <CommandItem onSelect={() => { router.push('/settings'); setSearchOpen(false); }}>Settings</CommandItem>
+                      <CommandItem onSelect={() => { router.push('/github'); setSearchOpen(false); }}>GitHub Connection</CommandItem>
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </CommandDialogPopup>
+            </CommandDialog>
           </>
         )}
 
-        <Button
-          size="sm"
-          className="h-7 px-3 text-[12px] font-medium bg-[var(--ds-primary)] text-[var(--ds-on-primary)] hover:bg-[var(--ds-primary-hover)]"
-        >
-          <Plus className="h-3 w-3 mr-1" />
-          New
-        </Button>
-
-        <div className="mx-1 h-4 w-px bg-[var(--ds-hairline)]" />
-
-        <Show when="signed-out">
-          <SignInButton mode="modal">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 px-2.5 text-[12px] font-medium text-[var(--ds-ink-subtle)] hover:bg-[var(--ds-surface-3)] hover:text-[var(--ds-ink)]"
-            >
-              Sign In
-            </Button>
-          </SignInButton>
-          <SignUpButton mode="modal">
-            <Button
-              size="sm"
-              className="h-7 px-3 text-[12px] font-medium bg-[var(--ds-primary)] text-[var(--ds-on-primary)] hover:bg-[var(--ds-primary-hover)]"
-            >
-              Sign Up
-            </Button>
-          </SignUpButton>
-        </Show>
-
-        <Show when="signed-in">
-          <UserButton
-            appearance={{
-              elements: {
-                userButtonAvatarBox: "h-7 w-7",
-              },
-            }}
-          />
-        </Show>
+        <Link href="/projects/new">
+          <Button
+            size="sm"
+            className="h-7 px-3 text-[12px] font-medium bg-[var(--ds-primary)] text-[var(--ds-on-primary)] hover:bg-[var(--ds-primary-hover)]"
+          >
+            <Plus className="h-3 w-3 mr-1" />
+            New
+          </Button>
+        </Link>
       </div>
     </header>
     </div>
