@@ -14,7 +14,7 @@ export function LiveTrace({ data, activeStage }: LiveTraceProps) {
       className="!border-l-0 bg-transparent p-3 md:p-4 [&>[data-slot=sidebar-inner]]:bg-transparent !top-[calc(var(--ds-navbar-h))] !h-[calc(100svh-var(--ds-navbar-h))]"
       style={{ "--sidebar-width": "20rem" } as React.CSSProperties}
     >
-      <div className="relative flex h-full flex-col overflow-hidden rounded-[var(--ds-rounded-xxl)] border border-[var(--ds-hairline)] bg-[var(--ds-canvas)]">
+      <div className="relative flex h-full flex-col overflow-hidden rounded-[var(--ds-rounded-xxl)] border border-[var(--ds-hairline)] bg-[var(--ds-surface-1)]">
         {" "}
         <div className="p-4 border-b border-[var(--ds-hairline)] flex items-center justify-between">
           {" "}

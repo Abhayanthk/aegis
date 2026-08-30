@@ -1948,9 +1948,9 @@ function RepairStage({ repair, onStageSelect }: any) {
                     className={cn(
                       "flex px-4 hover:bg-[var(--ds-surface-1)] transition-colors min-w-max",
                       isAdded &&
-                        "bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20",
+                      "bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20",
                       isRemoved &&
-                        "bg-red-500/10 text-red-400 hover:bg-red-500/20",
+                      "bg-red-500/10 text-red-400 hover:bg-red-500/20",
                       !isAdded && !isRemoved && "text-[var(--ds-ink-subtle)]",
                     )}
                   >
