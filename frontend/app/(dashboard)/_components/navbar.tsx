@@ -9,13 +9,17 @@ import {
   ChevronRight,
   Download,
   LayoutGrid,
+  Pause,
   Pencil,
+  Play,
   Plus,
   Search,
   Share2,
+  X,
   Zap,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useInvestigationControls } from "@/app/(investigation)/_components/investigation-context";
 import { SignInButton, SignUpButton, Show, UserButton } from "@clerk/nextjs";
 
 const toolbarActions = [
@@ -36,27 +40,29 @@ const routeTitles: Record<string, string> = {
 
 export function Navbar() {
   const pathname = usePathname();
+  const controls = useInvestigationControls();
 
   // Build breadcrumb from pathname
   const segments = pathname.split("/").filter(Boolean);
   
   let breadcrumbContent = null;
   
+  const isInvestigation = segments[0] === "projects" && segments.length >= 4 && segments[2] === "investigations";
+
   if (segments[0] === "projects" && segments.length >= 2 && segments[1] !== "new") {
     const projectName = segments[1];
     
     // Check if we're in an investigation route
-    if (segments[2] === "investigations" && segments[3]) {
-      const investigationId = segments[3].toUpperCase();
+    if (isInvestigation) {
       breadcrumbContent = (
         <>
           <ChevronRight className="h-3 w-3 text-[var(--ds-ink-tertiary)]" />
           <Link href="/projects" className="font-medium text-[var(--ds-ink-subtle)] hover:text-[var(--ds-ink)] transition-colors">
-            {projectName}
+            Projects
           </Link>
           <ChevronRight className="h-3 w-3 text-[var(--ds-ink-tertiary)]" />
           <span className="font-medium text-[var(--ds-ink)]">
-            Investigation #{investigationId}
+            Investigations
           </span>
         </>
       );
@@ -85,6 +91,11 @@ export function Navbar() {
     }
   }
 
+  // Determine if investigation controls should be visible
+  const showInvestigationControls = isInvestigation && controls && (
+    controls.status === "running" || controls.status === "pausing" || controls.status === "paused"
+  );
+
   return (
     <div className="fixed top-0 left-0 right-0 z-50 px-3 pt-3 md:px-4 md:pt-4">
       <header className="flex h-11 items-center rounded-[var(--ds-rounded-lg)] border border-[var(--ds-hairline)] bg-[var(--ds-surface-1)] px-4">
@@ -96,70 +107,111 @@ export function Navbar() {
         {breadcrumbContent}
       </div>
 
-      {/* Center: toolbar actions */}
-      <div className="ml-8 flex items-center gap-0.5">
-        {toolbarActions.map(({ icon: Icon, label }) => (
-          <Tooltip key={label}>
-            <TooltipTrigger
-              render={
-                <button
-                  type="button"
-                  aria-label={label}
-                  className="flex h-7 w-7 items-center justify-center rounded-[var(--ds-rounded-md)] text-[var(--ds-ink-subtle)] transition-colors duration-150 hover:bg-[var(--ds-surface-3)] hover:text-[var(--ds-ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ds-primary)]/40"
-                />
-              }
-            >
-              <Icon className="h-3.5 w-3.5" />
-            </TooltipTrigger>
-            <TooltipPopup>{label}</TooltipPopup>
-          </Tooltip>
-        ))}
-      </div>
+      {/* Center: toolbar actions (hidden during investigation for minimal focus) */}
+      {!isInvestigation && (
+        <div className="ml-8 flex items-center gap-0.5">
+          {toolbarActions.map(({ icon: Icon, label }) => (
+            <Tooltip key={label}>
+              <TooltipTrigger
+                render={
+                  <button
+                    type="button"
+                    aria-label={label}
+                    className="flex h-7 w-7 items-center justify-center rounded-[var(--ds-rounded-md)] text-[var(--ds-ink-subtle)] transition-colors duration-150 hover:bg-[var(--ds-surface-3)] hover:text-[var(--ds-ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ds-primary)]/40"
+                  />
+                }
+              >
+                <Icon className="h-3.5 w-3.5" />
+              </TooltipTrigger>
+              <TooltipPopup>{label}</TooltipPopup>
+            </Tooltip>
+          ))}
+        </div>
+      )}
 
       {/* Spacer */}
       <div className="flex-1" />
 
+      {/* Investigation controls: Pause / Cancel */}
+      {showInvestigationControls && (
+        <div className="flex items-center gap-1.5 mr-2">
+          {controls.isPaused ? (
+            <Button
+              onClick={controls.onResume}
+              variant="ghost"
+              size="sm"
+              className="h-7 gap-1.5 px-2.5 text-[12px] font-medium text-[var(--ds-ink-subtle)] hover:bg-[var(--ds-surface-3)] hover:text-[var(--ds-ink)]"
+            >
+              <Play className="h-3 w-3" />
+              Resume
+            </Button>
+          ) : (
+            <Button
+              onClick={controls.onPause}
+              variant="ghost"
+              size="sm"
+              className="h-7 gap-1.5 px-2.5 text-[12px] font-medium text-[var(--ds-ink-subtle)] hover:bg-[var(--ds-surface-3)] hover:text-[var(--ds-ink)]"
+            >
+              <Pause className="h-3 w-3" />
+              Pause
+            </Button>
+          )}
+          <Button
+            onClick={controls.onRequestCancel}
+            variant="ghost"
+            size="sm"
+            className="h-7 gap-1.5 px-2.5 text-[12px] font-medium text-[var(--ds-ink-subtle)] hover:bg-red-500/10 hover:text-red-500"
+          >
+            <X className="h-3 w-3" />
+            Cancel
+          </Button>
+        </div>
+      )}
+
       {/* Right: utility actions */}
       <div className="flex items-center gap-1">
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <button
-                type="button"
-                aria-label="Search"
-                className="flex h-7 w-7 items-center justify-center rounded-[var(--ds-rounded-md)] text-[var(--ds-ink-subtle)] transition-colors duration-150 hover:bg-[var(--ds-surface-3)] hover:text-[var(--ds-ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ds-primary)]/40"
-              />
-            }
-          >
-            <Search className="h-3.5 w-3.5" />
-          </TooltipTrigger>
-          <TooltipPopup>Search</TooltipPopup>
-        </Tooltip>
+        {!isInvestigation && (
+          <>
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <button
+                    type="button"
+                    aria-label="Search"
+                    className="flex h-7 w-7 items-center justify-center rounded-[var(--ds-rounded-md)] text-[var(--ds-ink-subtle)] transition-colors duration-150 hover:bg-[var(--ds-surface-3)] hover:text-[var(--ds-ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ds-primary)]/40"
+                  />
+                }
+              >
+                <Search className="h-3.5 w-3.5" />
+              </TooltipTrigger>
+              <TooltipPopup>Search</TooltipPopup>
+            </Tooltip>
 
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <button
-                type="button"
-                aria-label="Notifications"
-                className="flex h-7 w-7 items-center justify-center rounded-[var(--ds-rounded-md)] text-[var(--ds-ink-subtle)] transition-colors duration-150 hover:bg-[var(--ds-surface-3)] hover:text-[var(--ds-ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ds-primary)]/40"
-              />
-            }
-          >
-            <Bell className="h-3.5 w-3.5" />
-          </TooltipTrigger>
-          <TooltipPopup>Notifications</TooltipPopup>
-        </Tooltip>
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <button
+                    type="button"
+                    aria-label="Notifications"
+                    className="flex h-7 w-7 items-center justify-center rounded-[var(--ds-rounded-md)] text-[var(--ds-ink-subtle)] transition-colors duration-150 hover:bg-[var(--ds-surface-3)] hover:text-[var(--ds-ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ds-primary)]/40"
+                  />
+                }
+              >
+                <Bell className="h-3.5 w-3.5" />
+              </TooltipTrigger>
+              <TooltipPopup>Notifications</TooltipPopup>
+            </Tooltip>
 
-
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-7 gap-1.5 px-2.5 text-[12px] font-medium text-[var(--ds-ink-subtle)] hover:bg-[var(--ds-surface-3)] hover:text-[var(--ds-ink)]"
-        >
-          <Share2 className="h-3 w-3" />
-          Share
-        </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 gap-1.5 px-2.5 text-[12px] font-medium text-[var(--ds-ink-subtle)] hover:bg-[var(--ds-surface-3)] hover:text-[var(--ds-ink)]"
+            >
+              <Share2 className="h-3 w-3" />
+              Share
+            </Button>
+          </>
+        )}
 
         <Button
           size="sm"
