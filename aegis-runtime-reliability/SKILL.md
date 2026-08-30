@@ -190,9 +190,10 @@ playbook before delegating that role. Do not load all playbooks into every role.
 | Runtime Profiler     | `references/profiler-playbook.md`            |
 | Performance Repairer | `references/repairer-playbook.md`            |
 
-Evidence and verification contracts are in:
-- `references/evidence-contract.md`
-- `references/verification-contract.md`
+Evidence and verification contracts are root-agent-only references (not loaded
+by subagents):
+- `references/evidence-contract.md` — what constitutes valid evidence
+- `references/verification-contract.md` — how `verify.mjs` evaluates gates
 
 Verification thresholds are in `config/verification-policy.json`. Do not
 hard-code thresholds in prompts; the verifier reads them at runtime.
@@ -207,10 +208,15 @@ examples.
 
 ```text
 You are the Repository Analyst for the ANALYZE phase. Before any work, read
-{skill_dir}/references/analyst-playbook.md in full. Perform static analysis
-only: do not execute repository code. Return only the JSON contract required by
-that playbook, including package_manager and the actual test_command (or null
-when none exists). If the playbook cannot be read, stop and report that blocker.
+{skill_dir}/references/analyst-playbook.md in full.
+
+You have zero memory of the prior conversation.
+Repository Path: <ABSOLUTE PATH TO REPO>
+
+Perform static analysis only: do not execute repository code. Return only the
+JSON contract required by that playbook, including package_manager and the actual
+test_command (or null when none exists). If the playbook cannot be read, stop and
+report that blocker.
 ```
 
 **Runtime Profiler preparation**
@@ -233,11 +239,12 @@ You are the Runtime Profiler for the BASELINE phase. Before any work, read
 
 You have zero memory of the prior conversation. You must use:
 Analyst Report: <INSERT RAW JSON OR ABSOLUTE PATH TO FILE>
+Repository Path: <ABSOLUTE PATH TO REPO>
 
-CREATE the experiment-config.json using the Analyst artifact, then run the
-baseline experiment. Return the raw JSON output. Do not interpret the verdict,
-alter target code, or replace a missing test command with a no-op. If the
-playbook cannot be read, stop and report that blocker.
+CREATE the experiment config and write it to: <ABSOLUTE PATH>/experiment-config.json
+Then run the baseline experiment. Return the raw JSON output. Do not interpret
+the verdict, alter target code, or replace a missing test command with a no-op.
+If the playbook cannot be read, stop and report that blocker.
 ```
 
 **Runtime Profiler candidate**
@@ -264,6 +271,7 @@ You are the Performance Repairer for an approved REPAIR phase. Before any work,
 read {skill_dir}/references/repairer-playbook.md in full.
 
 You have zero memory of the prior conversation. You must act ONLY on the following evidence:
+Repository Path: <ABSOLUTE PATH TO REPO>
 Analyst Report: <INSERT RAW JSON OR ABSOLUTE PATH TO FILE>
 Baseline Metrics: <INSERT RAW JSON OR ABSOLUTE PATH TO baseline/metrics.json>
 Verification Verdict (if this is a retry): <INSERT RAW JSON OR ABSOLUTE PATH TO verdict.json>
