@@ -86,6 +86,31 @@ for (const field of REQUIRED_FIELDS) {
   }
 }
 
+function isNoOpFunctionalCommand(command) {
+  const normalized = String(command)
+    .replace(/(^|\s)#.*$/gm, '$1')
+    .trim()
+    .replace(/\s+/g, ' ');
+  if (normalized === '') return true;
+
+  const commands = normalized.split(/\s*(?:;|&&|\|\|)\s*/).filter(Boolean);
+  return commands.length > 0 && commands.every((part) =>
+    part === ':' ||
+    part === 'true' ||
+    part === 'exit' ||
+    part === 'exit 0' ||
+    /^(?:echo|printf)\b/.test(part),
+  );
+}
+
+if (typeof config.functional_test_command !== 'string' ||
+    isNoOpFunctionalCommand(config.functional_test_command)) {
+  console.error(
+    'FATAL: functional_test_command must run a real test suite or meaningful repo-local smoke check; no-op commands are invalid.',
+  );
+  process.exit(1);
+}
+
 // ---------------------------------------------------------------------------
 // Compute deterministic protocol hash
 // ---------------------------------------------------------------------------
