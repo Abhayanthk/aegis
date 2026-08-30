@@ -98,7 +98,9 @@ Return your findings as structured JSON to the root agent:
 {
   "files_changed": ["<relative path to each edited file>"],
   "diff_summary": "<human-readable summary of what you changed and why>",
-  "strategy_used": "<worker_threads|cooperative_chunking|algorithmic_fix|caching|async_conversion|deletion>",
+  "strategies_used": [
+    "<must contain at least one of: worker_threads|cooperative_chunking|algorithmic_fix|caching|async_conversion|deletion>"
+  ],
   "affected_tests": "<test command or null>"
 }
 ```
