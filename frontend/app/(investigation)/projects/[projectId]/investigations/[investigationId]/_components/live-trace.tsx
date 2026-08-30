@@ -1,13 +1,27 @@
+import React, { useState, useEffect } from "react";
 import { Activity, Box, Terminal, Bot } from "lucide-react";
 import { Sidebar } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
+
 interface LiveTraceProps {
   data: any;
   activeStage: string;
 }
+
 export function LiveTrace({ data, activeStage }: LiveTraceProps) {
   const { evidence, sandbox, activeAgent } = data;
-  /* Filter evidence... */ return (
+  const [timeString, setTimeString] = useState<string>("");
+
+  useEffect(() => {
+    const updateTime = () => {
+      setTimeString(new Date().toLocaleTimeString());
+    };
+    updateTime();
+    const interval = setInterval(updateTime, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
     <Sidebar
       side="right"
       collapsible="offcanvas"
@@ -15,20 +29,16 @@ export function LiveTrace({ data, activeStage }: LiveTraceProps) {
       style={{ "--sidebar-width": "20rem" } as React.CSSProperties}
     >
       <div className="relative flex h-full flex-col overflow-hidden rounded-[var(--ds-rounded-xxl)] border border-[var(--ds-hairline)] bg-[var(--ds-surface-1)]">
-        {" "}
         <div className="p-4 border-b border-[var(--ds-hairline)] flex items-center justify-between">
-          {" "}
           <div className="flex items-center gap-2 text-[11px] font-bold tracking-widest text-[var(--ds-ink)] uppercase font-heading">
-            {" "}
-            <Activity className="h-3.5 w-3.5 text-amber-500" /> Live Trace{" "}
-          </div>{" "}
+            <Activity className="h-3.5 w-3.5 text-amber-500" /> Live Trace
+          </div>
           <span
             suppressHydrationWarning
             className="text-[10px] text-[var(--ds-ink-tertiary)] uppercase font-heading tracking-wider"
           >
-            {" "}
-            {new Date().toLocaleTimeString()}{" "}
-          </span>{" "}
+            {timeString || "14:09:20"}
+          </span>
         </div>{" "}
         <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-6">
           {" "}

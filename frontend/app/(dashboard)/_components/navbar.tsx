@@ -9,13 +9,17 @@ import {
   ChevronRight,
   Download,
   LayoutGrid,
+  Pause,
   Pencil,
+  Play,
   Plus,
   Search,
   Share2,
+  X,
   Zap,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useInvestigationControls } from "@/app/(investigation)/_components/investigation-context";
 
 const toolbarActions = [
   { icon: Pencil, label: "Edit" },
@@ -35,6 +39,7 @@ const routeTitles: Record<string, string> = {
 
 export function Navbar() {
   const pathname = usePathname();
+  const controls = useInvestigationControls();
 
   // Build breadcrumb from pathname
   const segments = pathname.split("/").filter(Boolean);
@@ -85,6 +90,11 @@ export function Navbar() {
     }
   }
 
+  // Determine if investigation controls should be visible
+  const showInvestigationControls = isInvestigation && controls && (
+    controls.status === "running" || controls.status === "pausing" || controls.status === "paused"
+  );
+
   return (
     <div className="fixed top-0 left-0 right-0 z-50 px-3 pt-3 md:px-4 md:pt-4">
       <header className="flex h-11 items-center rounded-[var(--ds-rounded-lg)] border border-[var(--ds-hairline)] bg-[var(--ds-surface-1)] px-4">
@@ -120,6 +130,42 @@ export function Navbar() {
 
       {/* Spacer */}
       <div className="flex-1" />
+
+      {/* Investigation controls: Pause / Cancel */}
+      {showInvestigationControls && (
+        <div className="flex items-center gap-1.5 mr-2">
+          {controls.isPaused ? (
+            <Button
+              onClick={controls.onResume}
+              variant="ghost"
+              size="sm"
+              className="h-7 gap-1.5 px-2.5 text-[12px] font-medium text-[var(--ds-ink-subtle)] hover:bg-[var(--ds-surface-3)] hover:text-[var(--ds-ink)]"
+            >
+              <Play className="h-3 w-3" />
+              Resume
+            </Button>
+          ) : (
+            <Button
+              onClick={controls.onPause}
+              variant="ghost"
+              size="sm"
+              className="h-7 gap-1.5 px-2.5 text-[12px] font-medium text-[var(--ds-ink-subtle)] hover:bg-[var(--ds-surface-3)] hover:text-[var(--ds-ink)]"
+            >
+              <Pause className="h-3 w-3" />
+              Pause
+            </Button>
+          )}
+          <Button
+            onClick={controls.onRequestCancel}
+            variant="ghost"
+            size="sm"
+            className="h-7 gap-1.5 px-2.5 text-[12px] font-medium text-[var(--ds-ink-subtle)] hover:bg-red-500/10 hover:text-red-500"
+          >
+            <X className="h-3 w-3" />
+            Cancel
+          </Button>
+        </div>
+      )}
 
       {/* Right: utility actions */}
       <div className="flex items-center gap-1">

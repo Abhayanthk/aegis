@@ -39,7 +39,7 @@
       }
     },
 
-    "currentStage": "qodo_review",
+    "currentStage": "pull_request",
 
     "stages": [
       {
@@ -110,17 +110,9 @@
         "id": "pull_request",
         "name": "Pull request",
         "status": "completed",
-        "description": "Branch and commit created",
+        "description": "Pull request created",
         "startedAt": "2026-08-29T14:09:01Z",
         "completedAt": "2026-08-29T14:09:06Z"
-      },
-      {
-        "id": "qodo_review",
-        "name": "Qodo review",
-        "status": "completed",
-        "description": "Automated review passed",
-        "startedAt": "2026-08-29T14:09:20Z",
-        "completedAt": "2026-08-29T14:09:40Z"
       }
     ],
 

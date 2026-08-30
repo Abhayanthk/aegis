@@ -3,41 +3,114 @@
 import React from "react";
 import { cn } from "@/lib/utils";
 import { TbCircleDotted } from "react-icons/tb";
-import { Check } from "lucide-react";
+import { Check, X } from "lucide-react";
 import { GoDotFill } from "react-icons/go";
 import { motion, Variants } from "motion/react";
 import {
   Sidebar,
   SidebarContent,
-  SidebarHeader,
 } from "@/components/ui/sidebar";
 
-type Stage = {
+export type Stage = {
   id: string;
   name: string;
   description: string;
+  completedDescription?: string;
 };
 
-const stages: Stage[] = [
-  { id: "discover", name: "Discover", description: "Repository mapped" },
-  { id: "reproduce", name: "Reproduce", description: "Failure reproduced" },
-  { id: "measure", name: "Measure", description: "Baseline captured" },
-  { id: "diagnose", name: "Diagnose", description: "Cause isolated" },
-  { id: "repair", name: "Repair", description: "Minimal patch prepared" },
-  { id: "validation", name: "Local validation", description: "Patch checked" },
-  { id: "verify", name: "Verify", description: "Same workload rerun" },
-  { id: "approval", name: "Approval", description: "Human gate approved" },
-  { id: "pull_request", name: "Pull request", description: "Branch and commit pending" },
-  { id: "qodo_review", name: "Qodo review", description: "Automated review pending" },
+const STAGES: Stage[] = [
+  {
+    id: "repo_context",
+    name: "Repository context",
+    description: "Fetching repository info",
+    completedDescription: "Repository mapped",
+  },
+  {
+    id: "repo_analyzer",
+    name: "Repository analyzer",
+    description: "Finding runtime bottlenecks",
+    completedDescription: "Bottlenecks identified",
+  },
+  {
+    id: "endpoint_finder",
+    name: "Endpoint finder",
+    description: "Searching API routes",
+    completedDescription: "API target selected",
+  },
+  {
+    id: "baseline_test",
+    name: "Baseline test",
+    description: "Measuring current performance",
+    completedDescription: "Baseline captured",
+  },
+  {
+    id: "repair",
+    name: "Repair",
+    description: "Preparing candidate improvement",
+    completedDescription: "Minimal patch prepared",
+  },
+  {
+    id: "candidate_test",
+    name: "Candidate test",
+    description: "Testing repaired candidate",
+    completedDescription: "Patch checked",
+  },
+  {
+    id: "verification",
+    name: "Verification",
+    description: "Comparing before and after",
+    completedDescription: "Same workload rerun",
+  },
+  {
+    id: "human_gate",
+    name: "Human gate",
+    description: "Waiting for your decision",
+    completedDescription: "Human gate approved",
+  },
+  {
+    id: "pull_request",
+    name: "Pull request",
+    description: "Creating pull request",
+    completedDescription: "Pull request created",
+  },
 ];
 
 interface InvestigationSidebarProps {
   activeStage: string;
   onStageSelect: (stageId: string) => void;
-  getStageStatus: (stageId: string) => "completed" | "active" | "pending";
+  getStageStatus: (stageId: string) => "completed" | "active" | "pending" | "failed";
+  isPaused?: boolean;
+  attempt?: number;
+  maxAttempts?: number;
+  target?: { method: string; endpoint: string };
 }
 
-export function InvestigationSidebar({ activeStage, onStageSelect, getStageStatus }: InvestigationSidebarProps) {
+export function InvestigationSidebar({
+  activeStage,
+  onStageSelect,
+  getStageStatus,
+  isPaused = false,
+  attempt,
+  maxAttempts,
+  target,
+}: InvestigationSidebarProps) {
+  const [timeString, setTimeString] = React.useState<string>("");
+
+  React.useEffect(() => {
+    const updateTime = () => {
+      setTimeString(
+        new Date().toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: false,
+        })
+      );
+    };
+    updateTime();
+    const interval = setInterval(updateTime, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
   const parentvariant: Variants = {
     open: {
       transition: {
@@ -96,25 +169,6 @@ export function InvestigationSidebar({ activeStage, onStageSelect, getStageStatu
     },
   };
 
-  const circlevariant: Variants = {
-    open: {
-      rotate: 360,
-      transition: {
-        ease: "linear",
-        duration: 2.5,
-        repeat: Number.POSITIVE_INFINITY,
-      },
-    },
-    close: {
-      rotate: 0,
-      transition: {
-        ease: "easeInOut",
-        duration: 0.1,
-        repeat: 0,
-      },
-    },
-  };
-
   return (
     <Sidebar
       collapsible="offcanvas"
@@ -129,8 +183,6 @@ export function InvestigationSidebar({ activeStage, onStageSelect, getStageStatu
           "clbeam-container",
         )}
       >
-        {/* Header */}
-
         {/* Content */}
         <SidebarContent className="relative flex-1 overflow-hidden z-10">
           <div className="relative h-full w-full overflow-y-auto px-4 md:px-5">
@@ -142,27 +194,29 @@ export function InvestigationSidebar({ activeStage, onStageSelect, getStageStatu
                   <div className="flex h-full w-full items-center justify-between gap-3 rounded-[4px] bg-neutral-100 p-3 dark:bg-neutral-800">
                     <div className="flex items-center justify-center gap-4">
                       <motion.div
-                        animate={{ rotate: 360 }}
-                        transition={{ ease: "linear", duration: 2.5, repeat: Infinity }}
+                        animate={isPaused ? { rotate: 0 } : { rotate: 360 }}
+                        transition={{
+                          ease: "linear",
+                          duration: 2.5,
+                          repeat: isPaused ? 0 : Infinity,
+                        }}
                         className="h-4 w-4"
                       >
                         <TbCircleDotted className="h-full w-full text-primary" />
                       </motion.div>
                       <div className="flex flex-col">
-                        <p className="font-mono text-[10px] text-neutral-600 transition-all duration-300 group-hover:text-neutral-900 dark:text-neutral-400 dark:group-hover:text-neutral-100">
-                          Reliability run
+                        <p className="font-mono text-[10px] text-neutral-600 transition-all duration-300 group-hover:text-neutral-900 dark:text-neutral-400 dark:group-hover:text-neutral-100 whitespace-nowrap">
+                          {isPaused ? "Investigation paused" : "Reliability run"}
                         </p>
-                        <p className="font-mono text-[9px] text-neutral-500">
-                          POST /orders/process
+                        <p className="font-mono text-[9px] text-neutral-500 whitespace-nowrap">
+                          {target?.method && target?.endpoint
+                            ? `${target.method} ${target.endpoint}`
+                            : "POST /orders/process"}
                         </p>
                       </div>
                     </div>
-                    <p className="text-[10px] text-neutral-500">
-                      {new Date().toLocaleTimeString([], {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                        hour12: false,
-                      })}
+                    <p className="text-[10px] text-neutral-500 shrink-0 font-mono" suppressHydrationWarning>
+                      {timeString || "14:09"}
                     </p>
                   </div>
                 </div>
@@ -183,15 +237,19 @@ export function InvestigationSidebar({ activeStage, onStageSelect, getStageStatu
 
               {/* Investigation Stages List — staggered reveal on mount */}
               <motion.div
-                className="relative z-10 mt-6 flex flex-col gap-9 pl-6"
+                className="relative z-10 mt-6 flex flex-col gap-9 pl-6 pb-6"
                 variants={parentvariant}
                 initial="close"
                 animate="open"
               >
-                {stages.map(({ id, name, description }) => {
+                {STAGES.map(({ id, name, description, completedDescription }) => {
                   const status = getStageStatus(id);
                   const isClickable = status === "completed" || status === "active";
                   const isSelected = activeStage === id;
+                  const displayDesc =
+                    status === "completed" && completedDescription
+                      ? completedDescription
+                      : description;
 
                   return (
                     <motion.button
@@ -202,23 +260,29 @@ export function InvestigationSidebar({ activeStage, onStageSelect, getStageStatu
                       className={cn(
                         "flex w-full justify-start text-left",
                         status === "pending" && "opacity-50 cursor-not-allowed",
+                        status === "failed" && "opacity-80 cursor-not-allowed",
                         isClickable && "cursor-pointer",
                         isSelected && "opacity-100",
                       )}
                     >
                       <div className="relative mr-2 mt-1.5 h-6 w-6 shrink-0 z-10">
                         {/* Base dot — visible for pending stages */}
-                        <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/10 dark:bg-white/10">
-                          <GoDotFill className="h-2.5 w-2.5 text-neutral-400 dark:text-neutral-500" />
-                        </div>
+                        {status === "pending" && (
+                          <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/10 dark:bg-white/10">
+                            <GoDotFill className="h-2.5 w-2.5 text-neutral-400 dark:text-neutral-500" />
+                          </div>
+                        )}
 
                         {/* Completed — tick icon */}
                         {status === "completed" && (
                           <motion.div
                             variants={iconvariant}
-                            className="absolute inset-0 flex items-center justify-center rounded-full bg-white p-1"
+                            className="absolute inset-0 flex items-center justify-center rounded-full bg-neutral-900 dark:bg-white p-1"
                           >
-                            <Check className="h-3.5 w-3.5 text-neutral-100 dark:text-neutral-800" strokeWidth={3} />
+                            <Check
+                              className="h-3.5 w-3.5 text-white dark:text-neutral-900"
+                              strokeWidth={3}
+                            />
                           </motion.div>
                         )}
 
@@ -229,11 +293,25 @@ export function InvestigationSidebar({ activeStage, onStageSelect, getStageStatu
                             variants={iconvariant}
                           >
                             <motion.div
-                              animate={{ rotate: 360 }}
-                              transition={{ ease: "linear", duration: 2.5, repeat: Infinity }}
+                              animate={isPaused ? { rotate: 0 } : { rotate: 360 }}
+                              transition={{
+                                ease: "linear",
+                                duration: 2.5,
+                                repeat: isPaused ? 0 : Infinity,
+                              }}
                             >
                               <TbCircleDotted className="h-5 w-5 text-[var(--ds-warning)]" />
                             </motion.div>
+                          </motion.div>
+                        )}
+
+                        {/* Failed — error icon */}
+                        {status === "failed" && (
+                          <motion.div
+                            variants={iconvariant}
+                            className="absolute inset-0 flex items-center justify-center rounded-full bg-red-500/20"
+                          >
+                            <X className="h-3.5 w-3.5 text-red-500" strokeWidth={3} />
                           </motion.div>
                         )}
                       </div>
@@ -246,8 +324,10 @@ export function InvestigationSidebar({ activeStage, onStageSelect, getStageStatu
                             status === "completed"
                               ? "text-neutral-800 dark:text-neutral-200"
                               : status === "active"
-                                ? "text-neutral-800 dark:text-neutral-200"
-                                : "text-neutral-500 dark:text-neutral-500",
+                                ? "text-neutral-800 dark:text-neutral-200 font-bold"
+                                : status === "failed"
+                                  ? "text-red-500 dark:text-red-400"
+                                  : "text-neutral-500 dark:text-neutral-500",
                           )}
                         >
                           {name}
@@ -256,10 +336,12 @@ export function InvestigationSidebar({ activeStage, onStageSelect, getStageStatu
                           variants={descvariant}
                           className={cn(
                             "font-mono text-[9px]",
-                            "text-neutral-500",
+                            status === "failed"
+                              ? "text-red-400 dark:text-red-400"
+                              : "text-neutral-500",
                           )}
                         >
-                          {description}
+                          {displayDesc}
                         </motion.p>
                       </div>
                     </motion.button>

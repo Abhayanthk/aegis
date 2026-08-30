@@ -1,4 +1,6 @@
-import React, { useState, useEffect } from "react";
+"use client";
+
+import React, { useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { Button } from "@/components/ui/button";
 import {
@@ -6,1415 +8,1317 @@ import {
   Lock,
   X,
   Loader2,
-  ShieldAlert,
-  Cpu,
-  Activity,
-  Info,
-  AlertTriangle,
   ArrowRight,
   GitPullRequest,
-  ChevronDown,
-  FileCode,
   Copy,
   CheckCircle2,
-  CircleDashed,
   Circle,
-  PlayCircle,
+  Play,
+  Pause,
+  AlertTriangle,
+  RotateCcw,
+  ExternalLink,
+  FolderGit2,
+  ChevronDown,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import type { InvestigationStatus } from "@/app/(investigation)/_components/investigation-context";
+import { FileDiff, type FileDiffLine } from "@/components/agents/file-diff";
+
+/* ============================================================
+   TYPES
+   ============================================================ */
+
 interface StageContentProps {
   data: any;
   activeStage: string;
   onStageSelect: (stageId: string) => void;
+  investigationStatus: InvestigationStatus;
+  repairAttempt: number;
+  maxAttempts: number;
+  onRetry: () => void;
+  onReject: () => void;
+  onResume?: () => void;
+  onPause?: () => void;
 }
 
-function LocalValidationStage({ validation, repair, onStageSelect }: any) {
-  const [openCheckId, setOpenCheckId] = useState<number | null>(null);
-  const [openFileId, setOpenFileId] = useState<number | null>(null);
+/* ============================================================
+   SHARED: Stage Header
+   ============================================================ */
 
-  const getDiffForFile = (path: string) => {
-    if (path.includes("process.ts")) {
-      return `@@ -17,4 +17,3 @@
--  calculateRisk(order)
-+  await riskWorker.calculate(order)
-   return result`;
-    }
-    return `@@ -1,0 +1,8 @@
-+export async function calculate(order) {
-+  // Offloaded risk score
-+  return compute(order);
-+}`;
+function StageHeader({
+  status,
+  title,
+  description,
+}: {
+  status?: "completed" | "active" | "waiting" | "failed" | "paused" | "cancelled";
+  title: string;
+  description: string;
+}) {
+  const statusConfig: Record<string, { label: string; color: string; pulse?: boolean }> = {
+    completed: { label: "Completed", color: "text-emerald-500" },
+    active: { label: "Active", color: "text-amber-500", pulse: true },
+    waiting: { label: "Waiting for you", color: "text-amber-500", pulse: true },
+    failed: { label: "Failed", color: "text-red-500" },
+    paused: { label: "Paused", color: "text-[var(--ds-ink-subtle)]" },
+    cancelled: { label: "Cancelled", color: "text-[var(--ds-ink-subtle)]" },
   };
 
-  return (
-    <div className="flex flex-col animate-in fade-in slide-in-from-bottom-2 duration-500 max-w-[900px]">
-      {/* Header */}
-      <div className="flex flex-col gap-1.5 mb-6 md:mb-7">
-        <span className="text-[11px] font-bold tracking-[0.08em] text-emerald-500 uppercase font-heading">
-          Completed
-        </span>
-        <h1 className="text-[28px] md:text-[32px] font-semibold text-[var(--ds-ink)] tracking-tight leading-tight font-heading">
-          Local Validation
-        </h1>
-        <p className="text-[14px] text-[var(--ds-ink-subtle)] leading-relaxed mt-1 max-w-[680px]">
-          The patch was checked locally in the sandbox for correctness before
-          rerunning the workload.
-        </p>
-      </div>
-
-      {/* LOCAL CHECKS */}
-      <div className="flex flex-col mb-8 md:mb-10">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-[11px] font-bold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading">
-            Local Checks
-          </h3>
-          <span className="text-[11px] font-bold tracking-[0.08em] text-emerald-500 uppercase font-heading">
-            4 / 4 PASSED
-          </span>
-        </div>
-
-        <div className="flex flex-col border border-[var(--ds-hairline)] bg-[var(--ds-canvas)] rounded-[8px] overflow-hidden">
-          {validation.checks.map((check: any, i: number) => {
-            const isOpen = openCheckId === i;
-            return (
-              <div
-                key={i}
-                className="flex flex-col border-b border-[var(--ds-hairline)] last:border-0 overflow-hidden"
-              >
-                <button
-                  onClick={() => setOpenCheckId(isOpen ? null : i)}
-                  className="flex items-center justify-between p-4 bg-[var(--ds-surface-1)] cursor-pointer hover:bg-[var(--ds-surface-2)] transition-colors text-left"
-                >
-                  <div className="flex items-center gap-3">
-                    <Check className="h-4 w-4 text-emerald-500 shrink-0" />
-                    <span className="text-[13px] font-medium text-[var(--ds-ink)]">
-                      {check.name}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <span className="text-[13px] font-mono text-[var(--ds-ink)]">
-                      {check.result}
-                    </span>
-                    <motion.div
-                      animate={{ rotate: isOpen ? 90 : 0 }}
-                      transition={{ duration: 0.2, ease: "easeOut" }}
-                    >
-                      <ChevronDown className="h-3.5 w-3.5 text-[var(--ds-ink-tertiary)]" />
-                    </motion.div>
-                  </div>
-                </button>
-                <AnimatePresence initial={false}>
-                  {isOpen && (
-                    <motion.div
-                      initial={{ height: 0, opacity: 0, y: -4 }}
-                      animate={{ height: "auto", opacity: 1, y: 0 }}
-                      exit={{ height: 0, opacity: 0, y: -4 }}
-                      transition={{ duration: 0.2, ease: "easeOut" }}
-                      className="overflow-hidden"
-                    >
-                      <div className="px-4 py-4 md:px-11 bg-[var(--ds-canvas)] text-[12px] font-mono text-[var(--ds-ink-subtle)] border-t border-[var(--ds-hairline)]">
-                        {check.name.includes("Functional") && (
-                          <div className="flex flex-col gap-4">
-                            <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
-                              <span className="w-32">Tests executed</span>
-                              <span className="text-[var(--ds-ink)]">100</span>
-                              <span className="w-16 ml-4 text-emerald-500">
-                                Passed
-                              </span>
-                              <span className="text-[var(--ds-ink)]">100</span>
-                              <span className="w-16 ml-4 text-red-500">
-                                Failed
-                              </span>
-                              <span className="text-[var(--ds-ink)]">0</span>
-                              <span className="w-20 ml-4">Duration</span>
-                              <span className="text-[var(--ds-ink)]">
-                                8.42s
-                              </span>
-                            </div>
-                            <div className="flex flex-col gap-1">
-                              <span className="text-[var(--ds-ink-tertiary)] uppercase font-heading text-[10px] tracking-widest mb-1">
-                                Result
-                              </span>
-                              <span>All functional tests passed.</span>
-                            </div>
-                          </div>
-                        )}
-                        {check.name.includes("TypeScript") && (
-                          <div className="flex flex-col gap-4">
-                            <div className="flex flex-col gap-1">
-                              <span className="text-[var(--ds-ink-tertiary)] uppercase font-heading text-[10px] tracking-widest mb-1">
-                                Command
-                              </span>
-                              <span>$ tsc --noEmit</span>
-                            </div>
-                            <div className="flex flex-col gap-1">
-                              <span className="text-[var(--ds-ink-tertiary)] uppercase font-heading text-[10px] tracking-widest mb-1">
-                                Result
-                              </span>
-                              <span className="text-[var(--ds-ink)]">
-                                No type errors detected.
-                              </span>
-                            </div>
-                          </div>
-                        )}
-                        {check.name.includes("Lint") && (
-                          <div className="flex flex-col gap-4">
-                            <div className="flex flex-col gap-1">
-                              <span className="text-[var(--ds-ink-tertiary)] uppercase font-heading text-[10px] tracking-widest mb-1">
-                                Command
-                              </span>
-                              <span>$ eslint . --ext .ts,.tsx</span>
-                            </div>
-                            <div className="flex flex-col gap-1">
-                              <span className="text-[var(--ds-ink-tertiary)] uppercase font-heading text-[10px] tracking-widest mb-1">
-                                Result
-                              </span>
-                              <span className="text-[var(--ds-ink)]">
-                                No lint or formatting violations.
-                              </span>
-                            </div>
-                          </div>
-                        )}
-                        {check.name.includes("Changed files") && (
-                          <div className="flex flex-col gap-1">
-                            <span>
-                              {repair.files.length} files modified in this
-                              patch.
-                            </span>
-                            <span className="text-[var(--ds-ink)] mt-1">
-                              Diff cleanly applies to working tree.
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* REPAIR IS LOCALLY VALID */}
-      <div className="flex flex-col mb-8 md:mb-10">
-        <div className="flex flex-col p-4 md:p-5 rounded-[8px] border border-emerald-500/20 bg-emerald-500/[0.02]">
-          <div className="flex items-center gap-2 mb-2">
-            <Check className="h-4 w-4 text-emerald-500 shrink-0" />
-            <span className="text-[12px] font-bold tracking-widest text-[var(--ds-ink)] uppercase font-heading">
-              Repair is locally valid
-            </span>
-          </div>
-          <p className="text-[13px] text-[var(--ds-ink-subtle)] leading-relaxed pl-6">
-            All repository checks passed. The patch preserves functional
-            behavior and is ready for a fresh runtime reproduction.
-          </p>
-        </div>
-      </div>
-
-      {/* CHANGED FILES */}
-      <div className="flex flex-col mb-8 md:mb-10">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-[11px] font-bold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading">
-            Changed files
-          </h3>
-          <span className="text-[11px] font-bold tracking-[0.08em] text-[var(--ds-ink-tertiary)] uppercase font-heading">
-            {repair.files.length} FILES
-          </span>
-        </div>
-        <div className="flex flex-col border border-[var(--ds-hairline)] bg-[var(--ds-canvas)] rounded-[8px] overflow-hidden">
-          {repair.files.map((file: any, i: number) => {
-            const isFileOpen = openFileId === i;
-            return (
-              <div
-                key={i}
-                className="flex flex-col border-b border-[var(--ds-hairline)] last:border-0 overflow-hidden"
-              >
-                <button
-                  onClick={() => setOpenFileId(isFileOpen ? null : i)}
-                  className="flex items-center justify-between px-3 md:px-4 py-3 w-full bg-[var(--ds-surface-1)] hover:bg-[var(--ds-surface-2)] transition-colors text-left cursor-pointer"
-                >
-                  <div className="flex items-center gap-3">
-                    <FileCode className="h-4 w-4 text-[var(--ds-ink-subtle)] shrink-0" />
-                    <span className="text-[12px] font-mono text-[var(--ds-ink)]">
-                      {file.path}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-6 text-[12px] font-mono ml-4">
-                    <span className="text-[var(--ds-ink-subtle)] hidden sm:inline-block">
-                      modified
-                    </span>
-                    <div className="flex gap-2 w-16 justify-end shrink-0">
-                      <span className="text-emerald-500">
-                        +{file.changes.added}
-                      </span>
-                      <span className="text-[var(--ds-ink-subtle)]">/</span>
-                      <span className="text-red-500">
-                        -{file.changes.removed}
-                      </span>
-                    </div>
-                  </div>
-                </button>
-                <AnimatePresence initial={false}>
-                  {isFileOpen && (
-                    <motion.div
-                      initial={{ height: 0, opacity: 0, y: -4 }}
-                      animate={{ height: "auto", opacity: 1, y: 0 }}
-                      exit={{ height: 0, opacity: 0, y: -4 }}
-                      transition={{ duration: 0.2, ease: "easeOut" }}
-                      className="overflow-hidden"
-                    >
-                      <div className="px-3 md:px-4 py-3 bg-[#0a0a0a] text-[11.5px] font-mono border-t border-[var(--ds-hairline)]">
-                        <div className="text-[var(--ds-ink-tertiary)] mb-2 px-2 select-none border-b border-[var(--ds-hairline)] pb-2">
-                          {file.path}
-                        </div>
-                        <pre className="overflow-x-auto pb-1">
-                          {getDiffForFile(file.path)
-                            .split("\n")
-                            .map((line, j) => {
-                              let lineClass =
-                                "text-[var(--ds-ink-subtle)] px-2";
-                              let bgClass = "bg-transparent";
-                              if (line.startsWith("+")) {
-                                lineClass = "text-emerald-500 px-2";
-                                bgClass = "bg-emerald-500/10";
-                              } else if (line.startsWith("-")) {
-                                lineClass = "text-red-500 px-2";
-                                bgClass = "bg-red-500/10";
-                              } else if (line.startsWith("@@")) {
-                                lineClass =
-                                  "text-[var(--ds-ink-tertiary)] px-2";
-                              }
-                              return (
-                                <div
-                                  key={j}
-                                  className={`leading-relaxed w-full flex ${bgClass}`}
-                                >
-                                  <span className={lineClass}>{line}</span>
-                                </div>
-                              );
-                            })}
-                        </pre>
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Action */}
-      <div className="pt-0">
-        <Button
-          onClick={() => onStageSelect("verify")}
-          className="h-8 px-4 text-[13px] font-medium bg-[var(--ds-primary)] text-[var(--ds-on-primary)] hover:bg-[var(--ds-primary-hover)] border-0 gap-1.5"
-        >
-          Run fresh reproduction <ArrowRight className="h-3.5 w-3.5" />
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-function VerificationMetricRow({
-  label,
-  baseline,
-  verified,
-  baselineWidth,
-  verifiedWidth,
-  delay,
-  subtleVerified,
-}: any) {
-  return (
-    <div className="flex flex-col p-4 md:p-5 border-b border-[var(--ds-hairline)] last:border-0">
-      <span className="text-[10px] font-bold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading mb-3">
-        {label}
-      </span>
-      <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-8">
-        {/* Baseline */}
-        <motion.div
-          initial={{ opacity: 0, x: -5 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.3, ease: "easeOut", delay: delay }}
-          className="flex flex-col flex-1"
-        >
-          <span className="text-[16px] md:text-[20px] font-mono text-[var(--ds-ink-subtle)] line-through decoration-[var(--ds-ink-tertiary)] decoration-1">
-            {baseline}
-          </span>
-          <span className="text-[11px] text-[var(--ds-ink-tertiary)] mt-1 uppercase tracking-wider font-heading">
-            Baseline
-          </span>
-        </motion.div>
-
-        {/* Arrow */}
-        <motion.div
-          initial={{ opacity: 0, scale: 0.8 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.3, ease: "easeOut", delay: delay + 0.15 }}
-          className="hidden sm:flex items-center justify-center text-[var(--ds-ink-tertiary)]"
-        >
-          <ArrowRight className="h-4 w-4" />
-        </motion.div>
-
-        {/* Verified */}
-        <motion.div
-          initial={{ opacity: 0, x: 5 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.3, ease: "easeOut", delay: delay + 0.3 }}
-          className="flex flex-col flex-1 sm:items-end"
-        >
-          <span
-            className={cn(
-              "text-[16px] md:text-[20px] font-mono font-medium",
-              subtleVerified ? "text-[var(--ds-ink)]" : "text-emerald-500",
-            )}
-          >
-            {verified}
-          </span>
-          <span className="text-[11px] text-[var(--ds-ink-tertiary)] mt-1 uppercase tracking-wider font-heading">
-            Verified
-          </span>
-        </motion.div>
-      </div>
-
-      {/* Micro visualization */}
-      <div className="mt-4 flex flex-col gap-1.5 h-3">
-        <motion.div
-          initial={{ width: 0, opacity: 0 }}
-          animate={{ width: baselineWidth, opacity: 1 }}
-          transition={{ duration: 0.4, ease: "easeOut", delay: delay + 0.1 }}
-          className="h-[3px] bg-[var(--ds-surface-3)] rounded-full"
-        />
-        <motion.div
-          initial={{ width: 0, opacity: 0 }}
-          animate={{ width: verifiedWidth, opacity: 1 }}
-          transition={{ duration: 0.4, ease: "easeOut", delay: delay + 0.4 }}
-          className={cn(
-            "h-[3px] rounded-full",
-            subtleVerified ? "bg-[var(--ds-ink-muted)]" : "bg-emerald-500",
-          )}
-        />
-      </div>
-    </div>
-  );
-}
-
-function VerificationStage({ verification, onStageSelect }: any) {
-  return (
-    <div className="flex flex-col animate-in fade-in slide-in-from-bottom-2 duration-500 max-w-[900px]">
-      {/* Header */}
-      <div className="flex flex-col gap-1.5 mb-5 md:mb-6">
-        <span className="text-[11px] font-bold tracking-[0.08em] text-emerald-500 uppercase font-heading">
-          Completed
-        </span>
-        <h1 className="text-[28px] md:text-[32px] font-semibold text-[var(--ds-ink)] tracking-tight leading-tight font-heading">
-          Verification
-        </h1>
-        <p className="text-[14px] text-[var(--ds-ink-subtle)] leading-relaxed mt-1 max-w-[680px]">
-          The same workload and measurement protocol were rerun in a fresh
-          sandbox to deterministically verify the repair.
-        </p>
-      </div>
-
-      {/* Verification Context */}
-      <div className="flex items-center flex-wrap gap-x-3 gap-y-2 mb-8 md:mb-10 text-[12px] font-medium text-[var(--ds-ink-subtle)]">
-        <div className="flex items-center gap-1.5">
-          <Check className="h-3.5 w-3.5 text-emerald-500" /> Same workload
-        </div>
-        <span className="text-[var(--ds-hairline-strong)]">·</span>
-        <div className="flex items-center gap-1.5">
-          <Check className="h-3.5 w-3.5 text-emerald-500" /> Fresh sandbox
-        </div>
-        <span className="text-[var(--ds-hairline-strong)]">·</span>
-        <div className="flex items-center gap-1.5">
-          <Check className="h-3.5 w-3.5 text-emerald-500" /> Deterministic
-          verifier
-        </div>
-      </div>
-
-      {/* Main Verification Result */}
-      <div className="flex flex-col mb-8 md:mb-10">
-        <h3 className="text-[11px] font-bold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading mb-4">
-          Verification Result
-        </h3>
-        <div className="flex flex-col border border-[var(--ds-hairline)] bg-[var(--ds-canvas)] rounded-[8px] overflow-hidden">
-          <VerificationMetricRow
-            label="Event Loop P99"
-            baseline="4,217 ms"
-            verified="3.2 ms"
-            baselineWidth="90%"
-            verifiedWidth="2%"
-            delay={0.1}
-          />
-          <VerificationMetricRow
-            label="Health Availability"
-            baseline="16%"
-            verified="100%"
-            baselineWidth="16%"
-            verifiedWidth="100%"
-            delay={0.2}
-          />
-          <VerificationMetricRow
-            label="Endpoint P99"
-            baseline="5,102 ms"
-            verified="52 ms"
-            baselineWidth="95%"
-            verifiedWidth="3%"
-            delay={0.3}
-          />
-          <VerificationMetricRow
-            label="Functional Tests"
-            baseline="100 / 100"
-            verified="100 / 100"
-            baselineWidth="100%"
-            verifiedWidth="100%"
-            delay={0.4}
-            subtleVerified
-          />
-        </div>
-      </div>
-
-      {/* Verification Details */}
-      <div className="flex flex-col mb-8 md:mb-10">
-        <h3 className="text-[11px] font-bold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading mb-4">
-          Verification Details
-        </h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 py-4 border-y border-[var(--ds-hairline)] text-[12px]">
-          <div className="flex flex-col gap-1.5">
-            <span className="text-[var(--ds-ink-tertiary)]">Workload</span>
-            <span className="font-mono text-[var(--ds-ink)]">100 req/s</span>
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <span className="text-[var(--ds-ink-tertiary)]">Duration</span>
-            <span className="font-mono text-[var(--ds-ink)]">30s</span>
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <span className="text-[var(--ds-ink-tertiary)]">Runtime</span>
-            <span className="font-mono text-[var(--ds-ink)]">
-              Node.js 20.11
-            </span>
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <span className="text-[var(--ds-ink-tertiary)]">Sandbox</span>
-            <span className="font-mono text-[var(--ds-ink)]">daytona-7f2a</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Improvement Summary */}
-      <div className="flex flex-col mb-8 md:mb-10">
-        <h3 className="text-[11px] font-bold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading mb-4">
-          Improvement Summary
-        </h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="flex flex-col gap-2">
-            <span className="text-[10px] font-bold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading">
-              Performance
-            </span>
-            <div className="flex items-center justify-between text-[12px]">
-              <span className="text-[var(--ds-ink-subtle)]">
-                Event loop P99
-              </span>
-              <span className="font-mono text-emerald-500 font-medium">
-                −99.9%
-              </span>
-            </div>
-            <div className="flex items-center justify-between text-[12px]">
-              <span className="text-[var(--ds-ink-subtle)]">Endpoint P99</span>
-              <span className="font-mono text-emerald-500 font-medium">
-                −99.0%
-              </span>
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-2">
-            <span className="text-[10px] font-bold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading">
-              Health
-            </span>
-            <div className="flex items-center justify-between text-[12px]">
-              <span className="text-[var(--ds-ink-subtle)]">Availability</span>
-              <span className="font-mono text-emerald-500 font-medium">
-                16% → 100%
-              </span>
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-2">
-            <span className="text-[10px] font-bold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading">
-              Functional
-            </span>
-            <div className="flex items-center justify-between text-[12px]">
-              <span className="text-[var(--ds-ink-subtle)]">Tests</span>
-              <span className="font-mono text-[var(--ds-ink)] font-medium">
-                100 / 100 preserved
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* VERIFICATION PASSED */}
-      <div className="flex flex-col mb-8 md:mb-10">
-        <div className="flex flex-col p-4 md:p-5 rounded-[8px] border border-emerald-500/20 bg-emerald-500/[0.02]">
-          <div className="flex items-center gap-2 mb-2">
-            <Check className="h-4 w-4 text-emerald-500 shrink-0" />
-            <span className="text-[12px] font-bold tracking-widest text-[var(--ds-ink)] uppercase font-heading">
-              Verification passed
-            </span>
-          </div>
-          <p className="text-[13px] text-[var(--ds-ink-subtle)] leading-relaxed pl-6 mb-3">
-            The repair reproduced the expected improvement under the same
-            workload without changing functional behavior.
-          </p>
-          <div className="flex flex-col gap-1 pl-6 text-[12px] text-[var(--ds-ink-muted)]">
-            <span>Performance improved</span>
-            <span>Health recovered</span>
-            <span>Functional behavior preserved</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Action */}
-      <div className="pt-0">
-        <Button
-          onClick={() => onStageSelect("approval")}
-          className="h-8 px-4 text-[13px] font-medium bg-[var(--ds-primary)] text-[var(--ds-on-primary)] hover:bg-[var(--ds-primary-hover)] border-0 gap-1.5"
-        >
-          View approval status <ArrowRight className="h-3.5 w-3.5" />
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-function ApprovalStage({
-  approval,
-  verification,
-  repair,
-  onStageSelect,
-  prTitle,
-  setPrTitle,
-  prDescription,
-  setPrDescription,
-}: any) {
-  const [status, setStatus] = useState("waiting"); // waiting, approving, approved, rejected
-  const [approvingStep, setApprovingStep] = useState(-1);
-
-  const [isEditing, setIsEditing] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const [tempTitle, setTempTitle] = useState(prTitle);
-  const [tempDescription, setTempDescription] = useState(prDescription);
-
-  const handleSave = () => {
-    setIsSaving(true);
-    setTimeout(() => {
-      setPrTitle(tempTitle);
-      setPrDescription(tempDescription);
-      setIsSaving(false);
-      setIsEditing(false);
-    }, 600);
-  };
-
-  const steps = [
-    { name: "Accepting repair", status: "Approval recorded" },
-    { name: "Writing approved changes", status: "2 files updated" },
-    { name: "Creating branch", status: "Creating aegis/fix-a91f" },
-    { name: "Creating commit", status: "Committing approved repair" },
-    {
-      name: "Creating pull request",
-      status: "Opening pull request against main",
-    },
-  ];
-
-  const handleAccept = () => {
-    setStatus("approving");
-    setApprovingStep(0);
-
-    const timeouts = [700, 1400, 2100, 2800, 3600];
-
-    timeouts.forEach((delay, i) => {
-      setTimeout(() => {
-        if (i === timeouts.length - 1) {
-          setStatus("approved");
-          setApprovingStep(5);
-        } else {
-          setApprovingStep(i + 1);
-        }
-      }, delay);
-    });
-  };
-
-  if (status === "rejected") {
-    return (
-      <div className="flex flex-col animate-in fade-in slide-in-from-bottom-2 duration-500 max-w-[900px]">
-        <div className="flex flex-col gap-1.5 mb-5 md:mb-6">
-          <span className="text-[11px] font-bold tracking-[0.08em] text-[var(--ds-ink-subtle)] uppercase font-heading">
-            Stopped
-          </span>
-          <h1 className="text-[28px] md:text-[32px] font-semibold text-[var(--ds-ink)] tracking-tight leading-tight font-heading">
-            Repair rejected.
-          </h1>
-          <p className="text-[14px] text-[var(--ds-ink-subtle)] leading-relaxed mt-1 max-w-[680px]">
-            No changes were written to GitHub.
-          </p>
-        </div>
-
-        <div className="pt-4">
-          <Button
-            onClick={() => onStageSelect("verify")}
-            variant="outline"
-            className="h-8 px-4 text-[13px] font-medium"
-          >
-            Return to investigation
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  let headerText = "Waiting for you";
-  let headerColor = "text-amber-500";
-  let title = "Human Gate";
-  let desc =
-    "The repair has been verified. Review the result and choose what happens next.";
-
-  if (status === "approving") {
-    headerText = "Operation in progress";
-    headerColor = "text-[var(--ds-ink-subtle)]";
-    title = "Applying changes";
-  } else if (status === "approved") {
-    headerText = "Completed";
-    headerColor = "text-emerald-500";
-    desc = "Changes accepted and pull request created.";
-  }
+  const cfg = status ? (statusConfig[status] ?? statusConfig.active) : null;
 
   return (
-    <div className="flex flex-col animate-in fade-in slide-in-from-bottom-2 duration-500 max-w-[900px]">
-      <div className="flex flex-col gap-1.5 mb-8 md:mb-10">
+    <div className="flex flex-col gap-1.5 mb-8 md:mb-10">
+      {cfg && (
         <div className="flex items-center gap-2">
-          {status === "waiting" && (
+          {cfg.pulse && (
             <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
           )}
           <span
             className={cn(
-              "text-[11px] font-bold tracking-[0.08em] uppercase font-heading transition-colors duration-300",
-              headerColor,
+              "text-[11px] font-bold tracking-[0.08em] uppercase font-heading",
+              cfg.color,
             )}
           >
-            {headerText}
+            {cfg.label}
           </span>
         </div>
-        <h1 className="text-[28px] md:text-[32px] font-semibold text-[var(--ds-ink)] tracking-tight leading-tight font-heading transition-colors duration-300">
-          {title}
-        </h1>
-        <p className="text-[14px] text-[var(--ds-ink-subtle)] leading-relaxed mt-1 max-w-[680px] transition-colors duration-300">
-          {desc}
-        </p>
-      </div>
-
-      <motion.div
-        layout
-        className="flex flex-col border border-[var(--ds-hairline)] bg-[var(--ds-surface-1)] rounded-[8px] overflow-hidden"
-      >
-        <div className="flex flex-col p-5 md:p-6 border-b border-[var(--ds-hairline)]">
-          <span className="text-[10px] font-bold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading mb-4 block">
-            Human Decision
-          </span>
-          <span className="text-[15px] font-medium text-[var(--ds-ink)] mb-1 block">
-            The repair is verified and ready for review.
-          </span>
-          <span className="text-[13px] text-[var(--ds-ink-subtle)]">
-            AEGIS has completed the investigation and verified the proposed
-            repair against the original workload.
-          </span>
-        </div>
-
-        <div className="flex flex-col p-5 md:p-6 border-b border-[var(--ds-hairline)]">
-          <span className="text-[10px] font-bold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading mb-4 block">
-            Verified Result
-          </span>
-          <div className="flex flex-col gap-4">
-            <div className="flex items-center justify-between text-[12px]">
-              <span className="text-[var(--ds-ink-subtle)] font-bold tracking-widest uppercase font-heading text-[10px]">
-                Event loop P99
-              </span>
-              <div className="flex items-center gap-1.5 font-mono">
-                <span className="text-[var(--ds-ink-subtle)] line-through">
-                  4,217 ms
-                </span>
-                <span className="text-[var(--ds-ink-tertiary)]">→</span>
-                <span className="text-emerald-500">3.2 ms</span>
-              </div>
-            </div>
-            <div className="flex items-center justify-between text-[12px]">
-              <span className="text-[var(--ds-ink-subtle)] font-bold tracking-widest uppercase font-heading text-[10px]">
-                Health Availability
-              </span>
-              <div className="flex items-center gap-1.5 font-mono">
-                <span className="text-[var(--ds-ink-subtle)] line-through">
-                  16%
-                </span>
-                <span className="text-[var(--ds-ink-tertiary)]">→</span>
-                <span className="text-emerald-500">100%</span>
-              </div>
-            </div>
-            <div className="flex items-center justify-between text-[12px]">
-              <span className="text-[var(--ds-ink-subtle)] font-bold tracking-widest uppercase font-heading text-[10px]">
-                Endpoint P99
-              </span>
-              <div className="flex items-center gap-1.5 font-mono">
-                <span className="text-[var(--ds-ink-subtle)] line-through">
-                  5,102 ms
-                </span>
-                <span className="text-[var(--ds-ink-tertiary)]">→</span>
-                <span className="text-emerald-500">52 ms</span>
-              </div>
-            </div>
-            <div className="flex items-center justify-between text-[12px]">
-              <span className="text-[var(--ds-ink-subtle)] font-bold tracking-widest uppercase font-heading text-[10px]">
-                Functional tests
-              </span>
-              <span className="font-mono text-[var(--ds-ink)] font-medium">
-                100 / 100
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex flex-col p-5 md:p-6 border-b border-[var(--ds-hairline)]">
-          <span className="text-[10px] font-bold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading mb-4 block">
-            Proposed Change
-          </span>
-          <span className="text-[13px] text-[var(--ds-ink)] mb-4 block">
-            Offload CPU-bound risk scoring
-          </span>
-          <div className="flex flex-wrap items-center gap-6 text-[12px] font-mono text-[var(--ds-ink)]">
-            <span>2 files changed</span>
-            <span>100 / 100 tests passing</span>
-            <span>1 / 3 repair attempts</span>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2 p-4 border-b border-[var(--ds-hairline)] bg-[#111110]">
-          <Lock className="h-3.5 w-3.5 text-amber-500 shrink-0" />
-          <span className="text-[12px] text-[var(--ds-ink)]">
-            <span className="text-amber-500 font-medium">
-              GitHub has not been modified.
-            </span>{" "}
-            Approval is required before any GitHub write occurs.
-          </span>
-        </div>
-
-        <AnimatePresence initial={false} mode="wait">
-          {status === "waiting" && (
-            <motion.div
-              key="actions"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
-              className="flex flex-col p-5 md:p-6 bg-[var(--ds-canvas)] gap-4"
-            >
-              <span className="text-[12px] text-[var(--ds-ink-subtle)]">
-                Your decision controls whether AEGIS writes this repair to
-                GitHub.
-              </span>
-              <div className="flex items-center gap-3">
-                <Button
-                  onClick={() => setStatus("rejected")}
-                  variant="ghost"
-                  className="h-8 px-4 text-[13px] font-medium text-red-500 hover:text-red-400 hover:bg-red-500/10"
-                >
-                  Reject changes
-                </Button>
-                <Button
-                  onClick={() => onStageSelect("repair")}
-                  variant="outline"
-                  className="h-8 px-4 text-[13px] font-medium border-[var(--ds-hairline)] bg-[var(--ds-surface-1)] hover:bg-[var(--ds-surface-2)]"
-                >
-                  Redo
-                </Button>
-                <div className="flex-1" />
-                <Button
-                  onClick={handleAccept}
-                  className="h-8 px-4 text-[13px] font-medium bg-[var(--ds-primary)] text-[var(--ds-on-primary)] hover:bg-[var(--ds-primary-hover)] border-0 gap-1.5"
-                >
-                  Accept changes <ArrowRight className="h-3.5 w-3.5" />
-                </Button>
-              </div>
-            </motion.div>
-          )}
-
-          {(status === "approving" || status === "approved") && (
-            <motion.div
-              key="execution"
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: "auto", opacity: 1 }}
-              transition={{ duration: 0.4, ease: [0.25, 0.1, 0.25, 1] }}
-              className="flex flex-col bg-[var(--ds-canvas)]"
-            >
-              <div className="p-5 md:p-6 border-b border-[var(--ds-hairline)]">
-                <span className="text-[10px] font-bold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading mb-1 block">
-                  Creating Pull Request
-                </span>
-                <span className="text-[13px] text-[var(--ds-ink)]">
-                  AEGIS is applying the approved repair.
-                </span>
-
-                <div className="mt-8 flex flex-col pl-1">
-                  {steps.map((step, index) => {
-                    const isCompleted = index < approvingStep;
-                    const isActive = index === approvingStep;
-                    const isPending = index > approvingStep;
-
-                    return (
-                      <div key={index} className="flex gap-5 relative">
-                        {index < steps.length - 1 && (
-                          <div
-                            className={cn(
-                              "absolute left-[7px] top-5 bottom-[0px] w-[2px] transition-colors duration-500",
-                              isCompleted
-                                ? "bg-emerald-500/50"
-                                : "bg-[var(--ds-hairline)]",
-                            )}
-                          />
-                        )}
-
-                        <div className="flex flex-col items-center mt-0.5 z-10 shrink-0">
-                          {isCompleted ? (
-                            <div className="h-4 w-4 rounded-full bg-[var(--ds-canvas)] flex items-center justify-center text-emerald-500">
-                              <Check className="h-3.5 w-3.5" />
-                            </div>
-                          ) : isActive ? (
-                            <div className="h-4 w-4 rounded-full bg-[var(--ds-canvas)] flex items-center justify-center text-[var(--ds-ink)]">
-                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                            </div>
-                          ) : (
-                            <div className="h-4 w-4 rounded-full bg-[var(--ds-canvas)] flex items-center justify-center text-[var(--ds-ink-tertiary)]">
-                              <div className="h-1.5 w-1.5 rounded-full border border-[var(--ds-ink-tertiary)]" />
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="flex flex-col gap-1 pb-6 w-full">
-                          <span
-                            className={cn(
-                              "text-[13px] font-mono transition-colors duration-300",
-                              isCompleted
-                                ? "text-[var(--ds-ink-subtle)]"
-                                : isActive
-                                  ? "text-[var(--ds-ink)] font-medium"
-                                  : "text-[var(--ds-ink-tertiary)]",
-                            )}
-                          >
-                            {step.name}
-                          </span>
-                          <span
-                            className={cn(
-                              "text-[12px] transition-colors duration-300 font-sans",
-                              isCompleted || isActive
-                                ? "text-[var(--ds-ink-subtle)]"
-                                : "text-[var(--ds-ink-tertiary)]",
-                            )}
-                          >
-                            {isPending ? "Pending" : step.status}
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <AnimatePresence>
-                {status === "approved" && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: "auto" }}
-                    transition={{ duration: 0.4 }}
-                    className="flex flex-col"
-                  >
-                    <div className="flex flex-col p-5 md:p-6 border-b border-[var(--ds-hairline)]">
-                      <div className="flex items-center gap-2 mb-4">
-                        <Check className="h-4 w-4 text-emerald-500" />
-                        <span className="text-[13px] font-medium text-[var(--ds-ink)]">
-                          Pull request created
-                        </span>
-                      </div>
-
-                      <AnimatePresence mode="wait">
-                        {isEditing ? (
-                          <motion.div
-                            key="edit"
-                            initial={{ opacity: 0, y: -4 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: 4 }}
-                            transition={{ duration: 0.2 }}
-                            className="flex flex-col gap-4"
-                          >
-                            <div className="flex flex-col gap-1.5">
-                              <span className="text-[11px] font-medium text-[var(--ds-ink-subtle)]">
-                                Title
-                              </span>
-                              <input
-                                type="text"
-                                value={tempTitle}
-                                onChange={(e) => setTempTitle(e.target.value)}
-                                disabled={isSaving}
-                                className="h-9 w-full px-3 text-[14px] font-medium text-[var(--ds-ink)] bg-[var(--ds-surface-1)] border border-[var(--ds-hairline)] rounded-[6px] focus:outline-none focus:border-[var(--ds-ink-tertiary)] focus:ring-1 focus:ring-[var(--ds-ink-tertiary)] disabled:opacity-50"
-                              />
-                            </div>
-                            <div className="flex flex-col gap-1.5">
-                              <span className="text-[11px] font-medium text-[var(--ds-ink-subtle)]">
-                                Description
-                              </span>
-                              <textarea
-                                value={tempDescription}
-                                onChange={(e) =>
-                                  setTempDescription(e.target.value)
-                                }
-                                disabled={isSaving}
-                                rows={3}
-                                className="w-full p-3 text-[13px] text-[var(--ds-ink)] bg-[var(--ds-surface-1)] border border-[var(--ds-hairline)] rounded-[6px] focus:outline-none focus:border-[var(--ds-ink-tertiary)] focus:ring-1 focus:ring-[var(--ds-ink-tertiary)] resize-none disabled:opacity-50"
-                              />
-                            </div>
-
-                            <div className="flex items-center gap-2 mt-2">
-                              <Button
-                                onClick={() => {
-                                  setTempTitle(prTitle);
-                                  setTempDescription(prDescription);
-                                  setIsEditing(false);
-                                }}
-                                disabled={isSaving}
-                                variant="ghost"
-                                className="h-8 px-3 text-[12px] font-medium"
-                              >
-                                Cancel
-                              </Button>
-                              <Button
-                                onClick={handleSave}
-                                disabled={isSaving}
-                                className="h-8 px-4 text-[12px] font-medium bg-[var(--ds-ink)] text-[var(--ds-canvas)] w-[120px] justify-center transition-all"
-                              >
-                                {isSaving ? (
-                                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                ) : (
-                                  "Save changes"
-                                )}
-                              </Button>
-                            </div>
-                          </motion.div>
-                        ) : (
-                          <motion.div
-                            key="view"
-                            initial={{ opacity: 0, y: -4 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: 4 }}
-                            transition={{ duration: 0.2 }}
-                            className="flex flex-col gap-1.5 pl-6 border-l-2 border-[var(--ds-hairline)] ml-1.5"
-                          >
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-[13px] font-medium text-[var(--ds-ink)]">
-                                {prTitle}
-                              </span>
-                              <span className="text-[12px] font-mono text-[var(--ds-ink-tertiary)]">
-                                #42
-                              </span>
-                            </div>
-                            <div className="flex flex-col gap-1">
-                              <div className="flex items-center gap-2 text-[12px] font-mono text-[var(--ds-ink-subtle)]">
-                                <span className="text-[var(--ds-ink)]">
-                                  aegis/fix-a91f
-                                </span>
-                                <ArrowRight className="h-3 w-3 text-[var(--ds-ink-tertiary)]" />
-                                <span className="text-[var(--ds-ink)]">
-                                  main
-                                </span>
-                              </div>
-                            </div>
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-                    </div>
-
-                    <div className="flex items-center justify-end gap-3 p-5 md:p-6 bg-[var(--ds-canvas)]">
-                      <Button
-                        onClick={() => onStageSelect("pull_request")}
-                        className="h-8 px-4 text-[13px] font-medium bg-[var(--ds-primary)] text-[var(--ds-on-primary)] hover:bg-[var(--ds-primary-hover)] border-0 gap-1.5"
-                      >
-                        Raise PR <ArrowRight className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </motion.div>
+      )}
+      <h1 className="text-[28px] md:text-[32px] font-semibold text-[var(--ds-ink)] tracking-tight leading-tight font-heading">
+        {title}
+      </h1>
+      <p className="text-[14px] text-[var(--ds-ink-subtle)] leading-relaxed mt-1 max-w-[680px]">
+        {description}
+      </p>
     </div>
   );
 }
 
-function PullRequestStage({
-  pullRequest,
-  onStageSelect,
-  prTitle,
-  setPrTitle,
-  prDescription,
-  setPrDescription,
-}: any) {
-  const [isEditing, setIsEditing] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
+/* ============================================================
+   SHARED: Paused Overlay
+   ============================================================ */
 
-  const [tempTitle, setTempTitle] = useState(prTitle);
-  const [tempDescription, setTempDescription] = useState(prDescription);
+function PausedOverlay({ onResume }: { onResume?: () => void }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -8 }}
+      transition={{ duration: 0.3 }}
+      className="flex flex-col items-center justify-center py-20 text-center"
+    >
+      <div className="flex items-center justify-center h-12 w-12 rounded-full border border-[var(--ds-hairline)] bg-[var(--ds-surface-2)] mb-6">
+        <Pause className="h-5 w-5 text-[var(--ds-ink-subtle)]" />
+      </div>
+      <h2 className="text-[20px] font-semibold text-[var(--ds-ink)] font-heading mb-2">
+        Investigation paused
+      </h2>
+      <p className="text-[14px] text-[var(--ds-ink-subtle)] mb-8 max-w-[400px]">
+        AEGIS is waiting to resume. All progress, metrics, and trace history are preserved.
+      </p>
+      {onResume && (
+        <Button
+          onClick={onResume}
+          className="h-9 px-5 text-[13px] font-medium bg-[var(--ds-primary)] text-[var(--ds-on-primary)] hover:bg-[var(--ds-primary-hover)] border-0 gap-2"
+        >
+          <Play className="h-3.5 w-3.5" />
+          Resume investigation
+        </Button>
+      )}
+    </motion.div>
+  );
+}
 
-  const handleSave = () => {
-    setIsSaving(true);
-    setTimeout(() => {
-      setPrTitle(tempTitle);
-      setPrDescription(tempDescription);
-      setIsSaving(false);
-      setIsEditing(false);
-    }, 600);
-  };
+/* ============================================================
+   SHARED: Cancelled Overlay
+   ============================================================ */
 
-  const handleCancel = () => {
-    setTempTitle(prTitle);
-    setTempDescription(prDescription);
-    setIsEditing(false);
-  };
+function CancelledOverlay() {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -8 }}
+      transition={{ duration: 0.3 }}
+      className="flex flex-col items-center justify-center py-20 text-center"
+    >
+      <div className="flex items-center justify-center h-12 w-12 rounded-full border border-[var(--ds-hairline)] bg-[var(--ds-surface-2)] mb-6">
+        <X className="h-5 w-5 text-[var(--ds-ink-subtle)]" />
+      </div>
+      <h2 className="text-[20px] font-semibold text-[var(--ds-ink)] font-heading mb-2">
+        Investigation cancelled
+      </h2>
+      <p className="text-[14px] text-[var(--ds-ink-subtle)] max-w-[400px]">
+        No changes were written to GitHub.
+      </p>
+    </motion.div>
+  );
+}
+
+/* ============================================================
+   SHARED: MetricRow (compact label → value)
+   ============================================================ */
+
+function MetricRow({
+  label,
+  value,
+  mono = true,
+  className: extraClass,
+}: {
+  label: string;
+  value: string | React.ReactNode;
+  mono?: boolean;
+  className?: string;
+}) {
+  return (
+    <div className={cn("flex items-center justify-between py-3 border-b border-[var(--ds-hairline)] last:border-0", extraClass)}>
+      <span className="text-[13px] text-[var(--ds-ink-subtle)]">{label}</span>
+      <span className={cn("text-[13px] text-[var(--ds-ink)]", mono && "font-mono")}>
+        {value}
+      </span>
+    </div>
+  );
+}
+
+/* ============================================================
+   STAGE 1: Repository context (repo_context)
+   ============================================================ */
+
+function RepoInfoStage({ data, onStageSelect }: { data: any; onStageSelect: (id: string) => void }) {
+  const repository = data?.repository;
+  const discovery = data?.discovery;
+  const target = data?.target;
+
+  // Graceful loading / empty state
+  if (!repository && !discovery) {
+    return (
+      <div className="flex flex-col max-w-[820px] py-12">
+        <span className="text-[10px] font-bold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading mb-2">
+          Repository
+        </span>
+        <h1 className="text-[24px] font-semibold text-[var(--ds-ink)] font-heading mb-2">
+          Loading repository information…
+        </h1>
+        <p className="text-[13px] text-[var(--ds-ink-subtle)]">
+          Connecting to GitHub workspace.
+        </p>
+      </div>
+    );
+  }
+
+  // Real data extraction
+  const repoName = repository?.name || "Repository";
+  const repoOwner = repository?.owner;
+  const fullName = repoOwner ? `${repoOwner} / ${repoName}` : repoName;
+  const repoUrl = repository?.url;
+  const repoDescription =
+    repository?.description ||
+    "AEGIS will inspect this repository to identify runtime bottlenecks and testable execution paths.";
+  const branch = repository?.branch || "main";
+  const commitSha = repository?.commit || repository?.commitSha;
+  const commitMessage = repository?.commitMessage;
+  const commitTime = repository?.commitTime;
+  const lastCommitDisplay = [commitSha, commitMessage, commitTime].filter(Boolean).join(" · ");
+
+  const runtime = discovery?.runtime || data?.sandbox?.runtime;
+  const entrypoint = discovery?.entrypoint;
+  const filesInspected = discovery?.filesInspected;
+  const visibility = repository?.visibility || "private";
+
+  // Infer language cleanly from entrypoint or explicit repository metadata
+  const language =
+    repository?.language ||
+    (entrypoint?.endsWith(".ts")
+      ? "TypeScript"
+      : entrypoint?.endsWith(".js")
+        ? "JavaScript"
+        : entrypoint?.endsWith(".py")
+          ? "Python"
+          : entrypoint?.endsWith(".go")
+            ? "Go"
+            : undefined);
 
   return (
-    <div className="flex flex-col animate-in fade-in slide-in-from-bottom-2 duration-500 max-w-[900px]">
-      {/* Top Header */}
-      <div className="flex flex-col gap-1.5 mb-8 md:mb-10">
-        <span className="text-[11px] font-bold tracking-[0.08em] text-emerald-500 uppercase font-heading">
-          Completed
+    <motion.div
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
+      className="flex flex-col max-w-[820px]"
+    >
+      {/* Repository Identity */}
+      <div className="flex flex-col gap-1.5 mb-8">
+        <span className="text-[10px] font-bold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading">
+          Repository
         </span>
-        <h1 className="text-[28px] md:text-[32px] font-semibold text-[var(--ds-ink)] tracking-tight leading-tight font-heading">
-          Pull Request
+        <div className="flex items-center gap-3 mt-1">
+          <div className="flex items-center justify-center h-9 w-9 rounded-[6px] border border-[var(--ds-hairline)] bg-[var(--ds-surface-2)] text-[var(--ds-ink)] shrink-0">
+            <FolderGit2 className="h-4 w-4 text-[var(--ds-ink-subtle)]" />
+          </div>
+          <div className="flex flex-col">
+            <h1 className="text-[26px] md:text-[30px] font-semibold text-[var(--ds-ink)] tracking-tight leading-tight font-heading">
+              {repoName}
+            </h1>
+            <span className="text-[12px] text-[var(--ds-ink-subtle)] font-mono">
+              {fullName}
+            </span>
+          </div>
+        </div>
+        {repoDescription && (
+          <p className="text-[13px] text-[var(--ds-ink-subtle)] leading-relaxed mt-2.5 max-w-[680px]">
+            {repoDescription}
+          </p>
+        )}
+      </div>
+
+      {/* Repository Overview Surface */}
+      <div className="flex flex-col rounded-[8px] border border-[var(--ds-hairline)] bg-[var(--ds-canvas)] mb-6 overflow-hidden">
+        {/* Section 1: Core Configuration */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-y-4 gap-x-6 p-4 md:p-5 border-b border-[var(--ds-hairline)] text-[12px]">
+          {branch && (
+            <div className="flex flex-col gap-1">
+              <span className="text-[10px] font-bold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading">
+                Branch
+              </span>
+              <span className="font-mono text-[var(--ds-ink)] truncate">{branch}</span>
+            </div>
+          )}
+          {visibility && (
+            <div className="flex flex-col gap-1">
+              <span className="text-[10px] font-bold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading">
+                Visibility
+              </span>
+              <span className="text-[var(--ds-ink)] capitalize">{visibility}</span>
+            </div>
+          )}
+          {language && (
+            <div className="flex flex-col gap-1">
+              <span className="text-[10px] font-bold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading">
+                Language
+              </span>
+              <span className="text-[var(--ds-ink)]">{language}</span>
+            </div>
+          )}
+          {runtime && (
+            <div className="flex flex-col gap-1">
+              <span className="text-[10px] font-bold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading">
+                Runtime
+              </span>
+              <span className="font-mono text-[var(--ds-ink)]">{runtime}</span>
+            </div>
+          )}
+        </div>
+
+        {/* Section 2: Structure & Commit */}
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-y-4 gap-x-6 p-4 md:p-5 text-[12px] bg-[var(--ds-surface-1)]/30">
+          {entrypoint && (
+            <div className="flex flex-col gap-1">
+              <span className="text-[10px] font-bold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading">
+                Entrypoint
+              </span>
+              <span className="font-mono text-[var(--ds-ink)] truncate">{entrypoint}</span>
+            </div>
+          )}
+          {filesInspected !== undefined && (
+            <div className="flex flex-col gap-1">
+              <span className="text-[10px] font-bold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading">
+                Files
+              </span>
+              <span className="font-mono text-[var(--ds-ink)]">{filesInspected}</span>
+            </div>
+          )}
+          {lastCommitDisplay && (
+            <div className="flex flex-col gap-1 col-span-2 md:col-span-1">
+              <span className="text-[10px] font-bold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading">
+                Last commit
+              </span>
+              <span className="font-mono text-[var(--ds-ink-subtle)] truncate">{lastCommitDisplay}</span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Execution Context / Investigation Target */}
+      {target && (
+        <div className="flex flex-col rounded-[8px] border border-[var(--ds-hairline)] bg-[var(--ds-surface-1)] p-4 md:p-5 mb-8">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-[10px] font-bold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading">
+              Investigation Target
+            </span>
+            {target.description && (
+              <span className="text-[11px] text-[var(--ds-ink-subtle)]">
+                {target.description}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center justify-between gap-4 py-2.5 px-3 rounded-[6px] border border-[var(--ds-hairline)] bg-[var(--ds-canvas)]">
+            <div className="flex items-center gap-2.5 font-mono text-[13px]">
+              <span className="text-[11px] font-bold text-[var(--ds-primary)] uppercase">
+                {target.method}
+              </span>
+              <span className="text-[var(--ds-ink)] font-medium">
+                {target.endpoint}
+              </span>
+            </div>
+            {entrypoint && (
+              <div className="flex items-center gap-2 text-[12px] font-mono text-[var(--ds-ink-subtle)]">
+                <span className="text-[var(--ds-ink-tertiary)]">→</span>
+                <span>{entrypoint}</span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Actions: Primary Start Agent & Secondary See Repository */}
+      <div className="flex items-center gap-4 pt-0">
+        <Button
+          onClick={() => onStageSelect("repo_analyzer")}
+          className="h-9 px-5 text-[13px] font-medium bg-[var(--ds-primary)] text-[var(--ds-on-primary)] hover:bg-[var(--ds-primary-hover)] gap-2 border-0 shadow-sm"
+        >
+          Start Agent <ArrowRight className="h-3.5 w-3.5" />
+        </Button>
+        {repoUrl && (
+          <a
+            href={repoUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 text-[13px] text-[var(--ds-ink-subtle)] hover:text-[var(--ds-ink)] transition-colors px-2 py-1.5 font-medium"
+          >
+            <span>See repository</span>
+            <ExternalLink className="h-3.5 w-3.5" />
+          </a>
+        )}
+      </div>
+    </motion.div>
+  );
+}
+
+/* ============================================================
+   STAGE 2: Repository analyzer (repo_analyzer)
+   ============================================================ */
+
+function RepoAnalyzerStage({
+  data,
+  onStageSelect,
+  investigationStatus = "completed",
+}: {
+  data: any;
+  onStageSelect: (id: string) => void;
+  investigationStatus?: InvestigationStatus;
+}) {
+  const discovery = data?.discovery;
+  const diagnosis = data?.diagnosis;
+  const findings: any[] = discovery?.suspiciousPaths || [];
+  const primaryFinding = diagnosis?.primaryFinding;
+
+  // Expanded finding state (first finding expanded by default)
+  const [expandedIndex, setExpandedIndex] = useState<number | null>(0);
+
+  const toggleExpand = (index: number) => {
+    setExpandedIndex((prev) => (prev === index ? null : index));
+  };
+
+  // Determine stage state
+  const isPaused = investigationStatus === "paused" || investigationStatus === "pausing";
+  const isFailed = investigationStatus === "failed";
+  const isAnalyzing = investigationStatus === "running" && data?.status === "analyzing";
+
+  const statusType: "analyzing" | "completed" | "failed" | "paused" = isPaused
+    ? "paused"
+    : isFailed
+      ? "failed"
+      : isAnalyzing
+        ? "analyzing"
+        : "completed";
+
+  const totalFindings = findings.length;
+  const filesInspected = discovery?.filesInspected;
+  const filesRelevant = discovery?.filesRelevant;
+  const runtime = discovery?.runtime || data?.sandbox?.runtime || data?.repository?.runtime;
+  const primaryFile = findings[0]?.file || primaryFinding?.affectedEndpoint || discovery?.entrypoint;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
+      className="flex flex-col max-w-[840px]"
+    >
+      {/* Dynamic Animated Status Pill & Header */}
+      <div className="flex flex-col gap-2 mb-8">
+        <div className="flex items-center gap-2">
+          {statusType === "analyzing" && (
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border border-amber-500/20 bg-amber-500/10 text-amber-500 text-[11px] font-bold tracking-[0.08em] uppercase font-heading">
+              <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
+              ANALYZING
+            </div>
+          )}
+          {statusType === "completed" && (
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border border-emerald-500/20 bg-emerald-500/10 text-emerald-500 text-[11px] font-bold tracking-[0.08em] uppercase font-heading">
+              <Check className="h-3 w-3" strokeWidth={2.5} />
+              ANALYSIS COMPLETE
+            </div>
+          )}
+          {statusType === "failed" && (
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border border-red-500/20 bg-red-500/10 text-red-500 text-[11px] font-bold tracking-[0.08em] uppercase font-heading">
+              <AlertTriangle className="h-3 w-3" />
+              ANALYSIS FAILED
+            </div>
+          )}
+          {statusType === "paused" && (
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border border-[var(--ds-hairline)] bg-[var(--ds-surface-2)] text-[var(--ds-ink-subtle)] text-[11px] font-bold tracking-[0.08em] uppercase font-heading">
+              <Pause className="h-3 w-3" />
+              PAUSED
+            </div>
+          )}
+        </div>
+
+        <h1 className="text-[26px] md:text-[30px] font-semibold text-[var(--ds-ink)] tracking-tight leading-tight font-heading">
+          Repository analyzer
         </h1>
-        <p className="text-[14px] text-[var(--ds-ink-subtle)] leading-relaxed mt-1 max-w-[680px]">
-          Branch and commit created successfully.
+        <p className="text-[13px] text-[var(--ds-ink-subtle)] leading-relaxed max-w-[680px]">
+          {statusType === "analyzing"
+            ? "AEGIS is inspecting execution paths for runtime bottlenecks."
+            : totalFindings > 0
+              ? "AEGIS identified the execution paths most likely to affect runtime reliability."
+              : "Repository analysis completed with no actionable bottlenecks identified."}
         </p>
       </div>
 
-      <AnimatePresence mode="wait">
-        {!isEditing ? (
-          <motion.div
-            key="view"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.2 }}
-            className="flex flex-col border border-[var(--ds-hairline)] bg-[var(--ds-surface-1)] rounded-[8px] overflow-hidden mb-8 md:mb-10"
-          >
-            {/* PR HEADER */}
-            <div className="flex flex-col p-5 md:p-6 border-b border-[var(--ds-hairline)]">
-              <span className="text-[10px] font-bold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading mb-4 block">
-                Pull Request
+      {/* When Analyzing (Running state) */}
+      {statusType === "analyzing" && (
+        <div className="flex flex-col rounded-[8px] border border-[var(--ds-hairline)] bg-[var(--ds-canvas)] p-4 md:p-5 mb-8">
+          <span className="text-[10px] font-bold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading mb-3">
+            Analysis Progress
+          </span>
+          <div className="flex flex-col gap-2.5 text-[12px] font-mono">
+            <div className="flex items-center justify-between text-[var(--ds-ink)]">
+              <span>Repository structure</span>
+              <Check className="h-3.5 w-3.5 text-emerald-500" />
+            </div>
+            <div className="flex items-center justify-between text-[var(--ds-ink)]">
+              <span>Runtime characteristics</span>
+              <Check className="h-3.5 w-3.5 text-emerald-500" />
+            </div>
+            <div className="flex items-center justify-between text-amber-500 font-medium">
+              <span>Execution paths</span>
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            </div>
+            <div className="flex items-center justify-between text-[var(--ds-ink-tertiary)]">
+              <span>Bottleneck detection</span>
+              <span>…</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* When Completed with Findings */}
+      {statusType !== "analyzing" && totalFindings > 0 && (
+        <div className="flex flex-col mb-8">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-[10px] font-bold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading">
+              Identified Bottlenecks
+            </span>
+            <span className="text-[11px] font-mono text-[var(--ds-ink-subtle)]">
+              {totalFindings} {totalFindings === 1 ? "finding" : "findings"}
+            </span>
+          </div>
+
+          <div className="flex flex-col gap-3">
+            {findings.map((path: any, index: number) => {
+              const isExpanded = expandedIndex === index;
+              const isPrimary = index === 0;
+              const severity = (path.severity || "high").toLowerCase();
+
+              // Evidence items related to this finding (if available)
+              const relatedEvidence = diagnosis?.evidence?.filter((ev: any) =>
+                ev.file === path.file || ev.type === "profile" || ev.type === "runtime"
+              );
+
+              return (
+                <motion.div
+                  key={path.file || index}
+                  initial={{ opacity: 0, y: 4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.2, delay: index * 0.04 }}
+                  className={cn(
+                    "flex flex-col rounded-[8px] border transition-colors overflow-hidden",
+                    isPrimary
+                      ? "border-[var(--ds-hairline-strong)] bg-[var(--ds-canvas)]"
+                      : "border-[var(--ds-hairline)] bg-[var(--ds-canvas)]",
+                  )}
+                >
+                  {/* Finding Header (Clickable) */}
+                  <button
+                    type="button"
+                    onClick={() => toggleExpand(index)}
+                    className="flex items-start justify-between p-4 text-left w-full hover:bg-[var(--ds-surface-1)]/60 transition-colors gap-3"
+                  >
+                    <div className="flex flex-col gap-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {isPrimary && (
+                          <span className="text-[9px] font-bold tracking-wider text-[var(--ds-primary)] bg-[var(--ds-primary)]/10 px-1.5 py-0.5 rounded uppercase font-heading">
+                            Primary Finding
+                          </span>
+                        )}
+                        <span className="text-[13px] font-mono font-medium text-[var(--ds-ink)] truncate">
+                          {path.file}
+                        </span>
+                      </div>
+                      <p className="text-[13px] text-[var(--ds-ink-subtle)] leading-relaxed mt-0.5">
+                        {path.reason}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-3 shrink-0 pt-0.5">
+                      <span
+                        className={cn(
+                          "text-[10px] font-mono font-semibold px-2 py-0.5 rounded uppercase tracking-wider",
+                          severity === "high" && "text-amber-500 bg-amber-500/10 border border-amber-500/20",
+                          severity === "medium" && "text-amber-400 bg-amber-400/10 border border-amber-400/20",
+                          severity === "low" && "text-[var(--ds-ink-subtle)] bg-[var(--ds-surface-2)] border border-[var(--ds-hairline)]",
+                        )}
+                      >
+                        {severity === "high" ? "High Risk" : severity}
+                      </span>
+                      <ChevronDown
+                        className={cn(
+                          "h-4 w-4 text-[var(--ds-ink-tertiary)] transition-transform duration-200",
+                          isExpanded && "rotate-180 text-[var(--ds-ink)]",
+                        )}
+                      />
+                    </div>
+                  </button>
+
+                  {/* Expanded Detail Panel */}
+                  <AnimatePresence initial={false}>
+                    {isExpanded && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: "auto", opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
+                        className="overflow-hidden"
+                      >
+                        <div className="px-4 pb-4 pt-3 border-t border-[var(--ds-hairline)] bg-[var(--ds-surface-1)]/40 flex flex-col gap-3.5 text-[12px]">
+                          {/* File and Affected Scope */}
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div className="flex flex-col gap-1">
+                              <span className="text-[10px] font-bold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading">
+                                Source File
+                              </span>
+                              <span className="font-mono text-[var(--ds-ink)] text-[12px]">{path.file}</span>
+                            </div>
+                            {primaryFinding?.affectedEndpoint && (
+                              <div className="flex flex-col gap-1">
+                                <span className="text-[10px] font-bold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading">
+                                  Affected Endpoint
+                                </span>
+                                <span className="font-mono text-[var(--ds-ink)] text-[12px]">
+                                  {primaryFinding.affectedEndpoint}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Technical Cause */}
+                          {primaryFinding?.cause && (
+                            <div className="flex flex-col gap-1">
+                              <span className="text-[10px] font-bold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading">
+                                Root Mechanism
+                              </span>
+                              <p className="text-[12px] text-[var(--ds-ink)] leading-relaxed">
+                                {primaryFinding.cause}
+                              </p>
+                            </div>
+                          )}
+
+                          {/* Evidence Signals */}
+                          {relatedEvidence && relatedEvidence.length > 0 && (
+                            <div className="flex flex-col gap-1.5 pt-1">
+                              <span className="text-[10px] font-bold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading">
+                                Supporting Evidence
+                              </span>
+                              <div className="flex flex-col gap-1.5 font-mono text-[11px]">
+                                {relatedEvidence.map((ev: any, evIdx: number) => (
+                                  <div
+                                    key={evIdx}
+                                    className="flex items-center gap-2 text-[var(--ds-ink-subtle)] bg-[var(--ds-canvas)] py-1.5 px-2.5 rounded border border-[var(--ds-hairline)]"
+                                  >
+                                    <span className="text-[var(--ds-ink-tertiary)] uppercase text-[9px] w-14 shrink-0">
+                                      {ev.type}
+                                    </span>
+                                    <span className="text-[var(--ds-ink)] truncate">
+                                      {ev.description || `${ev.metric}: ${ev.value} ${ev.unit || ""}`}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </motion.div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Empty State when no findings */}
+      {statusType !== "analyzing" && totalFindings === 0 && (
+        <div className="flex flex-col p-6 rounded-[8px] border border-[var(--ds-hairline)] bg-[var(--ds-canvas)] mb-8 text-center items-center justify-center">
+          <Check className="h-5 w-5 text-emerald-500 mb-2" />
+          <h3 className="text-[14px] font-semibold text-[var(--ds-ink)] font-heading">
+            No actionable bottlenecks identified
+          </h3>
+          <p className="text-[12px] text-[var(--ds-ink-subtle)] mt-1 max-w-[420px]">
+            Repository analysis completed with no high-risk execution bottlenecks detected.
+          </p>
+        </div>
+      )}
+
+      {/* Technical Summary Surface */}
+      <div className="flex flex-col rounded-[8px] border border-[var(--ds-hairline)] bg-[var(--ds-canvas)] p-4 md:p-5 mb-8">
+        <span className="text-[10px] font-bold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading mb-3">
+          Analysis Metadata
+        </span>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-[12px]">
+          {filesInspected !== undefined && (
+            <div className="flex flex-col gap-1">
+              <span className="text-[10px] font-bold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading">
+                Files Inspected
               </span>
-              <div className="flex items-start gap-3">
-                <GitPullRequest className="h-5 w-5 text-[var(--ds-ink)] shrink-0 mt-0.5" />
-                <div className="flex flex-col gap-2">
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-[18px] md:text-[20px] font-semibold text-[var(--ds-ink)] font-heading leading-tight">
-                      {prTitle}
-                    </span>
-                    <span className="text-[16px] text-[var(--ds-ink-tertiary)] font-mono font-medium">
-                      #42
-                    </span>
-                  </div>
-                  <p className="text-[13px] text-[var(--ds-ink-subtle)] leading-relaxed max-w-[680px] whitespace-pre-wrap">
-                    {prDescription}
-                  </p>
-                </div>
-              </div>
+              <span className="font-mono text-[var(--ds-ink)]">{filesInspected}</span>
             </div>
-
-            {/* BRANCH INFORMATION */}
-            <div className="flex flex-col p-5 md:p-6 border-b border-[var(--ds-hairline)]">
-              <span className="text-[10px] font-bold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading mb-4 block">
-                Branch Information
+          )}
+          {filesRelevant !== undefined && (
+            <div className="flex flex-col gap-1">
+              <span className="text-[10px] font-bold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading">
+                Relevant Files
               </span>
-
-              <div className="flex items-center gap-3 mb-6 font-mono text-[12px]">
-                <span className="bg-[var(--ds-surface-2)] text-[var(--ds-ink)] px-2 py-1 rounded border border-[var(--ds-hairline)]">
-                  aegis/fix-a91f
-                </span>
-                <ArrowRight className="h-3.5 w-3.5 text-[var(--ds-ink-tertiary)]" />
-                <span className="bg-[var(--ds-surface-2)] text-[var(--ds-ink)] px-2 py-1 rounded border border-[var(--ds-hairline)]">
-                  main
-                </span>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-[12px]">
-                <div className="flex flex-col gap-1.5">
-                  <span className="text-[var(--ds-ink-tertiary)]">Branch</span>
-                  <span className="font-mono text-[var(--ds-ink)]">
-                    aegis/fix-a91f
-                  </span>
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <span className="text-[var(--ds-ink-tertiary)]">Commit</span>
-                  <span className="font-mono text-[var(--ds-ink)]">
-                    8d3c1f2
-                  </span>
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <span className="text-[var(--ds-ink-tertiary)]">Base</span>
-                  <span className="font-mono text-[var(--ds-ink)]">main</span>
-                </div>
-              </div>
+              <span className="font-mono text-[var(--ds-ink)]">{filesRelevant}</span>
             </div>
-
-            {/* CHANGE SUMMARY */}
-            <div className="flex flex-col p-5 md:p-6 border-b border-[var(--ds-hairline)]">
-              <span className="text-[10px] font-bold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading mb-4 block">
-                Change Summary
+          )}
+          {runtime && (
+            <div className="flex flex-col gap-1">
+              <span className="text-[10px] font-bold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading">
+                Runtime
               </span>
-
-              <div className="flex items-center gap-6 text-[13px] mb-6">
-                <span className="font-medium text-[var(--ds-ink)]">
-                  2 files changed
-                </span>
-                <div className="flex items-center gap-1.5 font-mono text-[12px]">
-                  <span className="text-emerald-500">+10</span>
-                  <span className="text-[var(--ds-ink-tertiary)]">/</span>
-                  <span className="text-red-500">-2</span>
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <div className="flex items-center gap-2">
-                  <Check className="h-4 w-4 text-emerald-500" />
-                  <span className="font-bold tracking-widest uppercase font-heading text-emerald-500 text-[10px]">
-                    Verified
-                  </span>
-                </div>
-                <div className="flex flex-col text-[var(--ds-ink)] font-mono text-[12px] pl-6 mt-0.5">
-                  <span>100 / 100 functional tests</span>
-                  <span className="text-[var(--ds-ink-subtle)]">
-                    Deterministic verification passed
-                  </span>
-                </div>
-              </div>
+              <span className="font-mono text-[var(--ds-ink)] truncate">{runtime}</span>
             </div>
-
-            {/* VERIFICATION CONTEXT */}
-            <div className="flex flex-col p-5 md:p-6 border-b border-[var(--ds-hairline)]">
-              <span className="text-[10px] font-bold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading mb-4 block">
-                Verified Change
+          )}
+          {primaryFile && (
+            <div className="flex flex-col gap-1">
+              <span className="text-[10px] font-bold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading">
+                Primary Path
               </span>
-              <span className="text-[13px] text-[var(--ds-ink)] mb-6 block">
-                Offload CPU-bound risk scoring from the Node.js main thread.
-              </span>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <div className="flex flex-col gap-1.5 text-[12px]">
-                  <span className="text-[var(--ds-ink-tertiary)]">
-                    Event Loop P99
-                  </span>
-                  <div className="flex items-center gap-1.5 font-mono">
-                    <span className="text-[var(--ds-ink-subtle)] line-through">
-                      4,217 ms
-                    </span>
-                    <span className="text-[var(--ds-ink-tertiary)]">→</span>
-                    <span className="text-emerald-500">3.2 ms</span>
-                  </div>
-                </div>
-                <div className="flex flex-col gap-1.5 text-[12px]">
-                  <span className="text-[var(--ds-ink-tertiary)]">
-                    Health Availability
-                  </span>
-                  <div className="flex items-center gap-1.5 font-mono">
-                    <span className="text-[var(--ds-ink-subtle)] line-through">
-                      16%
-                    </span>
-                    <span className="text-[var(--ds-ink-tertiary)]">→</span>
-                    <span className="text-emerald-500">100%</span>
-                  </div>
-                </div>
-                <div className="flex flex-col gap-1.5 text-[12px]">
-                  <span className="text-[var(--ds-ink-tertiary)]">
-                    Endpoint P99
-                  </span>
-                  <div className="flex items-center gap-1.5 font-mono">
-                    <span className="text-[var(--ds-ink-subtle)] line-through">
-                      5,102 ms
-                    </span>
-                    <span className="text-[var(--ds-ink-tertiary)]">→</span>
-                    <span className="text-emerald-500">52 ms</span>
-                  </div>
-                </div>
-                <div className="flex flex-col gap-1.5 text-[12px]">
-                  <span className="text-[var(--ds-ink-tertiary)]">
-                    Functional Tests
-                  </span>
-                  <span className="font-mono text-[var(--ds-ink)]">
-                    100 / 100
-                  </span>
-                </div>
-              </div>
+              <span className="font-mono text-[var(--ds-ink)] truncate">{primaryFile}</span>
             </div>
+          )}
+        </div>
+      </div>
 
-            {/* EDITABILITY INDICATOR */}
-            <div className="flex items-center gap-2 p-5 border-b border-[var(--ds-hairline)] bg-[var(--ds-surface-2)]">
-              <Info className="h-3.5 w-3.5 text-[var(--ds-ink-tertiary)] shrink-0" />
-              <div className="flex flex-col">
-                <span className="text-[12px] text-[var(--ds-ink)]">
-                  You can edit the title and description.
-                </span>
-                <span className="text-[12px] text-[var(--ds-ink-subtle)]">
-                  Branch, commit, verification results, and changed files are
-                  generated by AEGIS and cannot be modified.
-                </span>
-              </div>
-            </div>
+      {/* Primary Action Button */}
+      <div className="pt-0">
+        <Button
+          onClick={() => onStageSelect("endpoint_finder")}
+          disabled={statusType === "analyzing"}
+          className="h-9 px-5 text-[13px] font-medium bg-[var(--ds-primary)] text-[var(--ds-on-primary)] hover:bg-[var(--ds-primary-hover)] gap-2 border-0 shadow-sm disabled:opacity-50"
+        >
+          Find testable endpoints <ArrowRight className="h-3.5 w-3.5" />
+        </Button>
+      </div>
+    </motion.div>
+  );
+}
 
-            {/* ACTIONS */}
-            <div className="flex items-center gap-3 p-5 md:p-6 bg-[var(--ds-canvas)]">
-              <Button
-                onClick={() => setIsEditing(true)}
-                variant="outline"
-                className="h-8 px-4 text-[13px] font-medium"
-              >
-                Edit pull request
-              </Button>
-              <div className="flex-1" />
-              <Button
-                onClick={() => onStageSelect("qodo_review")}
-                className="h-8 px-4 text-[13px] font-medium bg-[var(--ds-primary)] text-[var(--ds-on-primary)] hover:bg-[var(--ds-primary-hover)] border-0 gap-1.5"
-              >
-                View Qodo Review <ArrowRight className="h-3.5 w-3.5" />
-              </Button>
-            </div>
-          </motion.div>
-        ) : (
-          <motion.div
-            key="edit"
-            initial={{ opacity: 0, scale: 0.98 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.98 }}
-            transition={{ duration: 0.2 }}
-            className="flex flex-col border border-[var(--ds-hairline)] bg-[var(--ds-surface-1)] rounded-[8px] overflow-hidden mb-8 md:mb-10 shadow-lg"
-          >
-            {/* EDITOR HEADER */}
-            <div className="flex flex-col p-5 md:p-6 border-b border-[var(--ds-hairline)]">
-              <span className="text-[15px] font-semibold text-[var(--ds-ink)] font-heading mb-1 block">
-                Edit pull request
-              </span>
-              <span className="text-[13px] text-[var(--ds-ink-subtle)]">
-                Update the title and description before continuing.
-              </span>
-            </div>
+/* ============================================================
+   STAGE 3: Endpoint Finder (endpoint_finder)
+   ============================================================ */
 
-            {/* EDITABLE FIELDS */}
-            <div className="flex flex-col gap-5 p-5 md:p-6 border-b border-[var(--ds-hairline)]">
-              <div className="flex flex-col gap-2">
-                <label className="text-[10px] font-bold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading">
-                  Title
-                </label>
-                <input
-                  type="text"
-                  value={tempTitle}
-                  onChange={(e) => setTempTitle(e.target.value)}
-                  disabled={isSaving}
-                  className="h-9 w-full px-3 text-[14px] font-medium text-[var(--ds-ink)] bg-[var(--ds-surface-2)] border border-[var(--ds-hairline)] rounded-[6px] focus:outline-none focus:border-[var(--ds-ink-tertiary)] focus:ring-1 focus:ring-[var(--ds-ink-tertiary)] disabled:opacity-50 transition-shadow"
-                />
-              </div>
-              <div className="flex flex-col gap-2">
-                <label className="text-[10px] font-bold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading">
-                  Description
-                </label>
-                <textarea
-                  value={tempDescription}
-                  onChange={(e) => setTempDescription(e.target.value)}
-                  disabled={isSaving}
-                  rows={6}
-                  className="w-full p-3 text-[14px] text-[var(--ds-ink)] bg-[var(--ds-surface-2)] border border-[var(--ds-hairline)] rounded-[6px] focus:outline-none focus:border-[var(--ds-ink-tertiary)] focus:ring-1 focus:ring-[var(--ds-ink-tertiary)] resize-y min-h-[120px] disabled:opacity-50 transition-shadow"
-                />
-              </div>
-            </div>
+function EndpointFinderStage({ data, onStageSelect }: { data: any; onStageSelect: (id: string) => void }) {
+  const target = data?.target;
+  const discovery = data?.discovery;
+  const diagnosis = data?.diagnosis;
 
-            {/* READ-ONLY INFO */}
-            <div className="flex flex-col p-5 md:p-6 border-b border-[var(--ds-hairline)] bg-[var(--ds-surface-2)]">
-              <div className="flex items-center justify-between mb-4">
-                <span className="text-[10px] font-bold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading">
-                  Pull Request Information
-                </span>
-                <span className="text-[10px] font-bold tracking-widest text-[var(--ds-ink-subtle)] uppercase font-heading bg-[var(--ds-surface-1)] border border-[var(--ds-hairline)] px-1.5 py-0.5 rounded">
-                  Read Only
-                </span>
-              </div>
+  // Extract discovered routes from real investigation data
+  const healthMethod = "GET";
+  const healthPath = discovery?.healthEndpoint?.replace("GET ", "") || data?.configuration?.healthProbe?.endpoint || "/healthz";
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-y-6 gap-x-8 text-[12px]">
-                <div className="flex flex-col gap-1.5">
-                  <span className="text-[var(--ds-ink-tertiary)]">
-                    Source branch
-                  </span>
-                  <span className="font-mono text-[var(--ds-ink)]">
-                    aegis/fix-a91f
-                  </span>
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <span className="text-[var(--ds-ink-tertiary)]">
-                    Target branch
-                  </span>
-                  <span className="font-mono text-[var(--ds-ink)]">main</span>
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <span className="text-[var(--ds-ink-tertiary)]">Commit</span>
-                  <span className="font-mono text-[var(--ds-ink)]">
-                    8d3c1f2
-                  </span>
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <span className="text-[var(--ds-ink-tertiary)]">
-                    Changed files
-                  </span>
-                  <span className="font-mono text-[var(--ds-ink)]">2</span>
-                </div>
-                <div className="flex flex-col gap-1.5 md:col-span-2">
-                  <span className="text-[var(--ds-ink-tertiary)]">
-                    Verification
-                  </span>
-                  <div className="flex items-center gap-2">
-                    <Check className="h-3.5 w-3.5 text-emerald-500" />
-                    <span className="font-mono text-[var(--ds-ink)]">
-                      100 / 100 tests passing
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
+  const targetMethod = target?.method || "POST";
+  const targetPath = target?.endpoint || "/orders/process";
 
-            {/* EDITOR ACTIONS */}
-            <div className="flex items-center justify-end gap-3 p-4 md:p-5 bg-[var(--ds-canvas)]">
-              <Button
-                onClick={handleCancel}
-                disabled={isSaving}
-                variant="ghost"
-                className="h-8 px-4 text-[13px] font-medium hover:bg-[var(--ds-surface-1)]"
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={handleSave}
-                disabled={isSaving}
-                className="h-8 px-4 text-[13px] font-medium bg-[var(--ds-ink)] text-[var(--ds-canvas)] w-[120px] justify-center transition-all"
-              >
-                {isSaving ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  "Save changes"
+  // Build the list of real routes found in discovery/target/routes
+  const rawRoutes: Array<{ method: string; path: string; description?: string; isProbe?: boolean }> = [
+    ...(data?.routes || []),
+    { method: healthMethod, path: healthPath, description: "Health probe endpoint", isProbe: true },
+    { method: targetMethod, path: targetPath, description: target?.description || "Order processing endpoint" },
+  ];
+
+  // Deduplicate by method + path
+  const uniqueRoutes = rawRoutes.filter(
+    (route, idx, arr) => arr.findIndex((r) => r.method === route.method && r.path === route.path) === idx
+  );
+
+  // Selected route state (defaults to configured target)
+  const [selectedRoute, setSelectedRoute] = useState<{ method: string; path: string; description?: string }>({
+    method: targetMethod,
+    path: targetPath,
+    description: target?.description || "Order processing endpoint",
+  });
+
+  // Why this target explanation from real data
+  const whyReason =
+    discovery?.suspiciousPaths?.[0]?.reason ||
+    diagnosis?.primaryFinding?.cause ||
+    diagnosis?.primaryFinding?.title ||
+    target?.description ||
+    "Selected as the most relevant testable surface.";
+
+  // Context metadata
+  const entrypoint = discovery?.entrypoint;
+  const relevantFile = discovery?.suspiciousPaths?.[0]?.file;
+  const workload = data?.configuration?.workload;
+
+  // Operation if available
+  const operation =
+    diagnosis?.primaryFinding?.cause?.includes("calculateRiskScore") ||
+    discovery?.suspiciousPaths?.[0]?.reason?.includes("risk scoring")
+      ? "calculateRiskScore()"
+      : undefined;
+
+  // Empty state handling
+  if (uniqueRoutes.length === 0) {
+    return (
+      <div className="flex flex-col max-w-[820px] py-12">
+        <span className="text-[10px] font-bold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading mb-2">
+          Endpoints Not Found
+        </span>
+        <h1 className="text-[24px] font-semibold text-[var(--ds-ink)] font-heading mb-2">
+          No API routes identified
+        </h1>
+        <p className="text-[13px] text-[var(--ds-ink-subtle)]">
+          AEGIS could not identify a suitable API route in this repository.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
+      className="flex flex-col max-w-[840px]"
+    >
+      {/* Title & Description (No status badge) */}
+      <div className="flex flex-col gap-1.5 mb-8">
+        <span className="text-[10px] font-bold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading">
+          Endpoint Discovery
+        </span>
+        <h1 className="text-[26px] md:text-[30px] font-semibold text-[var(--ds-ink)] tracking-tight leading-tight font-heading">
+          Endpoint Finder
+        </h1>
+        <p className="text-[13px] text-[var(--ds-ink-subtle)] leading-relaxed max-w-[680px]">
+          AEGIS searched the repository for API routes and selected the most relevant test surface.
+        </p>
+      </div>
+
+      {/* Discovered Routes */}
+      <div className="flex flex-col mb-6">
+        <div className="flex items-center justify-between mb-3">
+          <span className="text-[10px] font-bold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading">
+            Discovered Routes
+          </span>
+          <span className="text-[11px] font-mono text-[var(--ds-ink-subtle)]">
+            {uniqueRoutes.length} {uniqueRoutes.length === 1 ? "route" : "routes"} found
+          </span>
+        </div>
+        <div className="flex flex-col rounded-[8px] border border-[var(--ds-hairline)] bg-[var(--ds-canvas)] overflow-hidden divide-y divide-[var(--ds-hairline)]">
+          {uniqueRoutes.map((route, i) => {
+            const isSelected = selectedRoute.path === route.path && selectedRoute.method === route.method;
+            return (
+              <motion.button
+                key={i}
+                type="button"
+                initial={{ opacity: 0, y: 4 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.2, delay: i * 0.04 }}
+                onClick={() =>
+                  setSelectedRoute({
+                    method: route.method,
+                    path: route.path,
+                    description: route.description,
+                  })
+                }
+                className={cn(
+                  "flex items-center justify-between px-4 py-3 text-left transition-colors w-full",
+                  isSelected
+                    ? "bg-[var(--ds-surface-2)]/80 text-[var(--ds-ink)]"
+                    : "hover:bg-[var(--ds-surface-1)] text-[var(--ds-ink-subtle)] hover:text-[var(--ds-ink)]"
                 )}
-              </Button>
+              >
+                <div className="flex items-center gap-3 font-mono text-[13px]">
+                  <span
+                    className={cn(
+                      "text-[11px] font-bold uppercase w-12 shrink-0",
+                      route.method === "POST" ? "text-amber-500" : "text-blue-400"
+                    )}
+                  >
+                    {route.method}
+                  </span>
+                  <span
+                    className={cn(
+                      "font-medium",
+                      isSelected ? "text-[var(--ds-ink)]" : "text-[var(--ds-ink-subtle)]"
+                    )}
+                  >
+                    {route.path}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  {route.description && (
+                    <span className="text-[11px] text-[var(--ds-ink-tertiary)] hidden sm:inline">
+                      {route.description}
+                    </span>
+                  )}
+                  {isSelected ? (
+                    <span className="text-[10px] font-bold text-[var(--ds-primary)] bg-[var(--ds-primary)]/10 px-2 py-0.5 rounded uppercase font-heading">
+                      Selected
+                    </span>
+                  ) : (
+                    <span className="text-[11px] text-[var(--ds-ink-tertiary)] hover:text-[var(--ds-ink-subtle)]">
+                      Select
+                    </span>
+                  )}
+                </div>
+              </motion.button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Selected Target */}
+      <div className="flex flex-col mb-6">
+        <span className="text-[10px] font-bold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading mb-2.5">
+          Selected Target
+        </span>
+        <motion.div
+          layout
+          className="flex flex-col p-4 rounded-[8px] border border-[var(--ds-hairline-strong)] bg-[var(--ds-surface-1)]"
+        >
+          <div className="flex items-center gap-3 font-mono text-[14px]">
+            <span className="text-[11px] font-bold uppercase text-[var(--ds-primary)]">
+              {selectedRoute.method}
+            </span>
+            <span className="text-[var(--ds-ink)] font-semibold">
+              {selectedRoute.path}
+            </span>
+          </div>
+          {selectedRoute.description && (
+            <p className="text-[12px] text-[var(--ds-ink-subtle)] mt-1.5 leading-relaxed">
+              {selectedRoute.description}
+            </p>
+          )}
+        </motion.div>
+      </div>
+
+      {/* Why This Target */}
+      <div className="flex flex-col mb-6">
+        <span className="text-[10px] font-bold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading mb-2.5">
+          Why This Target
+        </span>
+        <div className="p-4 rounded-[8px] border border-[var(--ds-hairline)] bg-[var(--ds-canvas)]">
+          <p className="text-[13px] text-[var(--ds-ink)] leading-relaxed">
+            {whyReason}
+          </p>
+        </div>
+      </div>
+
+      {/* Context Metadata */}
+      {(entrypoint || relevantFile || operation || workload) && (
+        <div className="flex flex-col rounded-[8px] border border-[var(--ds-hairline)] bg-[var(--ds-canvas)] p-4 md:p-5 mb-8">
+          <span className="text-[10px] font-bold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading mb-3">
+            Context
+          </span>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-[12px]">
+            {entrypoint && (
+              <div className="flex flex-col gap-1">
+                <span className="text-[10px] font-bold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading">
+                  Entrypoint
+                </span>
+                <span className="font-mono text-[var(--ds-ink)] truncate">{entrypoint}</span>
+              </div>
+            )}
+            {relevantFile && (
+              <div className="flex flex-col gap-1">
+                <span className="text-[10px] font-bold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading">
+                  Relevant File
+                </span>
+                <span className="font-mono text-[var(--ds-ink)] truncate">{relevantFile}</span>
+              </div>
+            )}
+            {operation && (
+              <div className="flex flex-col gap-1">
+                <span className="text-[10px] font-bold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading">
+                  Operation
+                </span>
+                <span className="font-mono text-[var(--ds-ink)] truncate">{operation}</span>
+              </div>
+            )}
+            {workload && (
+              <div className="flex flex-col gap-1">
+                <span className="text-[10px] font-bold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading">
+                  Configured Workload
+                </span>
+                <span className="font-mono text-[var(--ds-ink)]">
+                  {workload.requestsPerSecond} req/s · {workload.type}
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Primary Action Button */}
+      <div className="pt-0">
+        <Button
+          onClick={() => onStageSelect("baseline_test")}
+          className="h-9 px-5 text-[13px] font-medium bg-[var(--ds-primary)] text-[var(--ds-on-primary)] hover:bg-[var(--ds-primary-hover)] gap-2 border-0 shadow-sm"
+        >
+          Establish baseline <ArrowRight className="h-3.5 w-3.5" />
+        </Button>
+      </div>
+    </motion.div>
+  );
+}
+
+/* ============================================================
+   STAGE 4: Baseline Test Runner (baseline_test)
+   ============================================================ */
+
+function BaselineStage({
+  data,
+  onStageSelect,
+  investigationStatus = "completed",
+}: {
+  data: any;
+  onStageSelect: (id: string) => void;
+  investigationStatus?: InvestigationStatus;
+}) {
+  const { baseline, reproduction, target, sandbox, discovery, configuration } = data;
+  const metrics = baseline?.metrics;
+
+  const isRunning = investigationStatus === "running" && data?.status === "measuring";
+  const isFailed = investigationStatus === "failed";
+
+  const targetEndpoint = target ? `${target.method} ${target.endpoint}` : "POST /orders/process";
+  const requestsPerSec = reproduction?.workload?.requestsPerSecond || configuration?.workload?.requestsPerSecond || 100;
+  const durationSec = reproduction?.workload?.durationSeconds || 30;
+  const sandboxId = sandbox?.id;
+  const runtime = sandbox?.runtime || discovery?.runtime;
+
+  if (isRunning) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 6 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
+        className="flex flex-col max-w-[840px]"
+      >
+        <div className="flex flex-col gap-1.5 mb-8">
+          <span className="text-[10px] font-bold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading">
+            Baseline Measurement
+          </span>
+          <h1 className="text-[26px] md:text-[30px] font-semibold text-[var(--ds-ink)] tracking-tight leading-tight font-heading">
+            Running baseline
+          </h1>
+          <p className="text-[13px] text-[var(--ds-ink-subtle)] leading-relaxed max-w-[680px]">
+            AEGIS is measuring the selected endpoint under the configured workload.
+          </p>
+        </div>
+
+        <div className="flex flex-col rounded-[8px] border border-[var(--ds-hairline)] bg-[var(--ds-canvas)] p-5 mb-8">
+          <div className="flex items-center gap-2.5 text-[13px] text-amber-500 font-mono">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            <span>Collecting runtime measurements…</span>
+          </div>
+        </div>
+      </motion.div>
+    );
+  }
+
+  if (isFailed) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 6 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
+        className="flex flex-col max-w-[840px]"
+      >
+        <div className="flex flex-col gap-1.5 mb-8">
+          <span className="text-[10px] font-bold tracking-widest text-red-500 uppercase font-heading">
+            Measurement Failed
+          </span>
+          <h1 className="text-[26px] md:text-[30px] font-semibold text-[var(--ds-ink)] tracking-tight leading-tight font-heading">
+            Baseline test failed
+          </h1>
+          <p className="text-[13px] text-[var(--ds-ink-subtle)] leading-relaxed max-w-[680px]">
+            AEGIS could not complete the baseline workload against the sandbox.
+          </p>
+        </div>
+
+        <div className="pt-0">
+          <Button
+            onClick={() => onStageSelect("baseline_test")}
+            className="h-9 px-5 text-[13px] font-medium bg-[var(--ds-primary)] text-[var(--ds-on-primary)] hover:bg-[var(--ds-primary-hover)] gap-2 border-0 shadow-sm"
+          >
+            Retry baseline <RotateCcw className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      </motion.div>
+    );
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
+      className="flex flex-col max-w-[840px]"
+    >
+      {/* Title & Description (No status badge) */}
+      <div className="flex flex-col gap-1.5 mb-8">
+        <span className="text-[10px] font-bold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading">
+          Performance Baseline
+        </span>
+        <h1 className="text-[26px] md:text-[30px] font-semibold text-[var(--ds-ink)] tracking-tight leading-tight font-heading">
+          Baseline test
+        </h1>
+        <p className="text-[13px] text-[var(--ds-ink-subtle)] leading-relaxed max-w-[680px]">
+          AEGIS ran the selected workload against the original repository to establish a performance baseline.
+        </p>
+      </div>
+
+      {/* Workload Context */}
+      <div className="flex flex-col mb-6">
+        <span className="text-[10px] font-bold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading mb-2.5">
+          Workload
+        </span>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 rounded-[8px] border border-[var(--ds-hairline)] bg-[var(--ds-canvas)] text-[12px]">
+          <div className="flex flex-col gap-1 col-span-2 md:col-span-1">
+            <span className="text-[10px] font-bold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading">
+              Target
+            </span>
+            <span className="font-mono text-[var(--ds-ink)] truncate">{targetEndpoint}</span>
+          </div>
+          <div className="flex flex-col gap-1">
+            <span className="text-[10px] font-bold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading">
+              Requests / sec
+            </span>
+            <span className="font-mono text-[var(--ds-ink)]">{requestsPerSec}</span>
+          </div>
+          <div className="flex flex-col gap-1">
+            <span className="text-[10px] font-bold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading">
+              Duration
+            </span>
+            <span className="font-mono text-[var(--ds-ink)]">{durationSec}s</span>
+          </div>
+          {sandboxId && (
+            <div className="flex flex-col gap-1">
+              <span className="text-[10px] font-bold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading">
+                Sandbox
+              </span>
+              <span className="font-mono text-[var(--ds-ink)] truncate">{sandboxId}</span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Baseline Metrics Table */}
+      {metrics && (
+        <div className="flex flex-col mb-6">
+          <span className="text-[10px] font-bold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading mb-2.5">
+            Baseline Metrics
+          </span>
+          <div className="flex flex-col rounded-[8px] border border-[var(--ds-hairline)] bg-[var(--ds-canvas)] overflow-hidden divide-y divide-[var(--ds-hairline)]">
+            {metrics.eventLoopP99 && (
+              <motion.div
+                initial={{ opacity: 0, x: -4 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.2, delay: 0.04 }}
+                className="flex items-center justify-between px-4 py-3 text-[13px]"
+              >
+                <span className="text-[var(--ds-ink-subtle)]">99th Event-Loop Delay</span>
+                <div className="flex items-center gap-3 font-mono">
+                  <span className="text-amber-500 font-semibold">
+                    {metrics.eventLoopP99.value.toLocaleString()} {metrics.eventLoopP99.unit}
+                  </span>
+                  {metrics.eventLoopP99.target && (
+                    <span className="text-[11px] text-[var(--ds-ink-tertiary)]">
+                      target &lt; {metrics.eventLoopP99.target} {metrics.eventLoopP99.unit}
+                    </span>
+                  )}
+                </div>
+              </motion.div>
+            )}
+
+            {metrics.endpointP99 && (
+              <motion.div
+                initial={{ opacity: 0, x: -4 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.2, delay: 0.08 }}
+                className="flex items-center justify-between px-4 py-3 text-[13px]"
+              >
+                <span className="text-[var(--ds-ink-subtle)]">99th Endpoint Latency</span>
+                <div className="flex items-center gap-3 font-mono">
+                  <span className="text-amber-500 font-semibold">
+                    {metrics.endpointP99.value.toLocaleString()} {metrics.endpointP99.unit}
+                  </span>
+                  {metrics.endpointP99.threshold && (
+                    <span className="text-[11px] text-[var(--ds-ink-tertiary)]">
+                      target &lt; {metrics.endpointP99.threshold} {metrics.endpointP99.unit}
+                    </span>
+                  )}
+                </div>
+              </motion.div>
+            )}
+
+            {metrics.healthAvailability && (
+              <motion.div
+                initial={{ opacity: 0, x: -4 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.2, delay: 0.12 }}
+                className="flex items-center justify-between px-4 py-3 text-[13px]"
+              >
+                <span className="text-[var(--ds-ink-subtle)]">Health Availability</span>
+                <div className="flex items-center gap-3 font-mono">
+                  <span className="text-amber-500 font-semibold">
+                    {metrics.healthAvailability.value}{metrics.healthAvailability.unit}
+                  </span>
+                  <span className="text-[11px] text-[var(--ds-ink-tertiary)]">
+                    target 100%
+                  </span>
+                </div>
+              </motion.div>
+            )}
+
+            <motion.div
+              initial={{ opacity: 0, x: -4 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.2, delay: 0.16 }}
+              className="flex items-center justify-between px-4 py-3 text-[13px]"
+            >
+              <span className="text-[var(--ds-ink-subtle)]">Requests / sec</span>
+              <span className="font-mono text-[var(--ds-ink)]">{requestsPerSec}</span>
+            </motion.div>
+
+            {metrics.functionalTests && (
+              <motion.div
+                initial={{ opacity: 0, x: -4 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.2, delay: 0.2 }}
+                className="flex items-center justify-between px-4 py-3 text-[13px]"
+              >
+                <span className="text-[var(--ds-ink-subtle)]">Functional Tests</span>
+                <div className="flex items-center gap-1.5 text-emerald-500 font-mono text-[12px]">
+                  <Check className="h-3.5 w-3.5" />
+                  <span>
+                    {metrics.functionalTests.passed} / {metrics.functionalTests.total} passed
+                  </span>
+                </div>
+              </motion.div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Baseline Status / Assessment */}
+      <div className="flex flex-col mb-8">
+        <span className="text-[10px] font-bold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading mb-2.5">
+          Baseline Status
+        </span>
+        <div className="flex flex-col p-4 rounded-[8px] border border-amber-500/20 bg-amber-500/[0.04]">
+          <div className="flex items-center gap-2 mb-1.5">
+            <span className="text-[13px] font-semibold text-[var(--ds-ink)] font-heading">
+              Baseline exceeds target
+            </span>
+          </div>
+          <p className="text-[13px] text-[var(--ds-ink-subtle)] leading-relaxed">
+            {baseline?.summary || reproduction?.failure || "Performance degraded under concurrent traffic. 99th latency exceeded configured targets."}
+          </p>
+        </div>
+      </div>
+
+      {/* Primary Action */}
+      <div className="pt-0">
+        <Button
+          onClick={() => onStageSelect("repair")}
+          className="h-9 px-5 text-[13px] font-medium bg-[var(--ds-primary)] text-[var(--ds-on-primary)] hover:bg-[var(--ds-primary-hover)] gap-2 border-0 shadow-sm"
+        >
+          Prepare repair <ArrowRight className="h-3.5 w-3.5" />
+        </Button>
+      </div>
+    </motion.div>
+  );
+}
+
+/* ============================================================
+   STAGE 5: Repair (repair)
+   ============================================================ */
+
+interface FilePatch {
+  path: string;
+  status?: "modified" | "created" | "deleted";
+  added: number;
+  removed: number;
+  lines: FileDiffLine[];
+}
+
+function WhyThisRepairDisclosure({
+  reason,
+  strategy,
+}: {
+  reason?: string;
+  strategy?: string;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <div className="flex flex-col mt-3">
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="inline-flex items-center gap-1.5 text-[12px] font-medium text-[var(--ds-ink-subtle)] hover:text-[var(--ds-ink)] transition-colors self-start py-1"
+      >
+        <span>Why this repair?</span>
+        <ChevronDown
+          className={cn("h-3.5 w-3.5 transition-transform duration-200", isOpen && "rotate-180 text-[var(--ds-ink)]")}
+        />
+      </button>
+
+      <AnimatePresence initial={false}>
+        {isOpen && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
+            className="overflow-hidden"
+          >
+            <div className="p-4 rounded-[8px] border border-[var(--ds-hairline)] bg-[var(--ds-surface-1)]/60 text-[12px] text-[var(--ds-ink-subtle)] leading-relaxed mt-2 flex flex-col gap-2">
+              <p>
+                {reason ||
+                  "The synchronous risk calculation was identified as blocking the Node.js main thread during the baseline workload."}
+              </p>
+              {strategy && (
+                <p className="text-[var(--ds-ink)] font-mono text-[11px]">
+                  Strategy: {strategy} — delegates CPU-bound execution to a worker boundary without modifying the public endpoint contract.
+                </p>
+              )}
             </div>
           </motion.div>
         )}
@@ -1423,1489 +1327,1418 @@ function PullRequestStage({
   );
 }
 
-const REVIEW_CHECKS = [
-  "Repository context",
-  "Changed files analyzed",
-  "Dependency impact",
-  "Regression analysis",
-  "Behavioral correctness",
-  "Security review",
-  "Final verdict",
-];
+function RepairAgentStage({
+  data,
+  onStageSelect,
+  investigationStatus = "completed",
+}: {
+  data: any;
+  onStageSelect: (id: string) => void;
+  investigationStatus?: InvestigationStatus;
+}) {
+  const { diagnosis, repair, target } = data;
 
-const ACTIVITY_LOGS = [
-  "Inspecting src/orders/process.ts",
-  "Tracing risk scoring execution path",
-  "Comparing changed behavior against baseline",
-  "Checking worker isolation",
-  "No regression detected",
-];
+  const isRunning = investigationStatus === "running" && data?.status === "repairing";
+  const isFailed = investigationStatus === "failed";
+  const isPaused = investigationStatus === "paused" || investigationStatus === "pausing";
 
-function QodoReviewStage({ prTitle }: any) {
-  const [activeCheck, setActiveCheck] = React.useState(0);
-  const [activeLog, setActiveLog] = React.useState(0);
-  const [isCompleted, setIsCompleted] = React.useState(false);
-  const [showDetails, setShowDetails] = React.useState(false);
-
-  React.useEffect(() => {
-    let checkInterval: NodeJS.Timeout;
-    let logInterval: NodeJS.Timeout;
-
-    if (!isCompleted) {
-      checkInterval = setInterval(() => {
-        setActiveCheck((prev) => {
-          if (prev >= REVIEW_CHECKS.length - 1) {
-            setIsCompleted(true);
-            return prev;
-          }
-          return prev + 1;
-        });
-      }, 800);
-
-      logInterval = setInterval(() => {
-        setActiveLog((prev) => {
-          if (prev >= ACTIVITY_LOGS.length - 1) return prev;
-          return prev + 1;
-        });
-      }, 1000);
+  // Build structured patches from investigation data
+  const patches: FilePatch[] = (repair?.files || [
+    { path: "src/orders/process.ts", changes: { added: 2, removed: 2 } },
+    { path: "src/workers/risk-worker.ts", changes: { added: 8, removed: 0 } },
+  ]).map((file: any) => {
+    if (file.path === "src/orders/process.ts") {
+      return {
+        path: file.path,
+        status: "modified",
+        added: file.changes?.added ?? 2,
+        removed: file.changes?.removed ?? 2,
+        lines: [
+          { id: "1", type: "context", oldLine: 18, newLine: 18, content: "export async function processOrder(order) {" },
+          { id: "2", type: "context", oldLine: 19, newLine: 19, content: "" },
+          { id: "3", type: "removed", oldLine: 20, content: "  const result = calculateRiskScore(order);" },
+          { id: "4", type: "removed", oldLine: 21, content: "  return persistOrder({ ...order, result });" },
+          { id: "5", type: "added", newLine: 20, content: "  const result = await riskWorker.calculate(order);" },
+          { id: "6", type: "added", newLine: 21, content: "  return persistOrder({ ...order, result });" },
+          { id: "7", type: "context", oldLine: 22, newLine: 22, content: "}" },
+        ],
+      };
     }
 
-    return () => {
-      clearInterval(checkInterval);
-      clearInterval(logInterval);
+    if (file.path === "src/workers/risk-worker.ts") {
+      return {
+        path: file.path,
+        status: "created",
+        added: file.changes?.added ?? 8,
+        removed: file.changes?.removed ?? 0,
+        lines: [
+          { id: "1", type: "context", newLine: 1, content: "import { Order } from '../types';" },
+          { id: "2", type: "context", newLine: 2, content: "" },
+          { id: "3", type: "added", newLine: 3, content: "export const riskWorker = {" },
+          { id: "4", type: "added", newLine: 4, content: "  async calculate(order: Order): Promise<number> {" },
+          { id: "5", type: "added", newLine: 5, content: "    // Delegated worker thread execution offloading CPU risk scoring" },
+          { id: "6", type: "added", newLine: 6, content: "    const score = executeRiskModel(order);" },
+          { id: "7", type: "added", newLine: 7, content: "    return score;" },
+          { id: "8", type: "added", newLine: 8, content: "  }," },
+          { id: "9", type: "context", newLine: 9, content: "};" },
+        ],
+      };
+    }
+
+    return {
+      path: file.path,
+      status: "modified",
+      added: file.changes?.added ?? 0,
+      removed: file.changes?.removed ?? 0,
+      lines: [
+        { id: "1", type: "context", oldLine: 1, newLine: 1, content: `// Patch for ${file.path}` },
+      ],
     };
-  }, [isCompleted]);
+  });
+
+  // Expand primary file by default, secondary files collapsed
+  const [expandedFiles, setExpandedFiles] = useState<Record<string, boolean>>({
+    [patches[0]?.path || "src/orders/process.ts"]: true,
+  });
+
+  const toggleFile = (path: string) => {
+    setExpandedFiles((prev) => ({
+      ...prev,
+      [path]: !prev[path],
+    }));
+  };
+
+  const totalAdded = patches.reduce((sum, p) => sum + p.added, 0);
+  const totalRemoved = patches.reduce((sum, p) => sum + p.removed, 0);
+  const filesChangedCount = repair?.filesChanged || patches.length;
+  const rootCause = diagnosis?.primaryFinding?.cause || diagnosis?.title || "Synchronous CPU-bound work blocks the Node.js main thread.";
+
+  if (isFailed) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 6 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
+        className="flex flex-col max-w-[840px]"
+      >
+        <div className="flex flex-col gap-1.5 mb-8">
+          <span className="text-[10px] font-bold tracking-widest text-red-500 uppercase font-heading">
+            Repair Failed
+          </span>
+          <h1 className="text-[26px] md:text-[30px] font-semibold text-[var(--ds-ink)] tracking-tight leading-tight font-heading">
+            Repair generation failed
+          </h1>
+          <p className="text-[13px] text-[var(--ds-ink-subtle)] leading-relaxed max-w-[680px]">
+            AEGIS could not prepare a valid candidate patch for the bottleneck.
+          </p>
+        </div>
+
+        <div className="pt-0">
+          <Button
+            onClick={() => onStageSelect("repair")}
+            className="h-9 px-5 text-[13px] font-medium bg-[var(--ds-primary)] text-[var(--ds-on-primary)] hover:bg-[var(--ds-primary-hover)] gap-2 border-0 shadow-sm"
+          >
+            Retry repair <RotateCcw className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      </motion.div>
+    );
+  }
 
   return (
-    <div className="flex flex-col animate-in fade-in slide-in-from-bottom-2 duration-500 max-w-[900px]">
-      {/* Top Header */}
-      <div className="flex flex-col gap-1.5 mb-8 md:mb-10">
-        <div className="flex items-center gap-2">
-          {!isCompleted && (
-            <span className="h-1.5 w-1.5 rounded-full bg-blue-500 animate-pulse" />
-          )}
-          <span
-            className={cn(
-              "text-[11px] font-bold tracking-[0.08em] uppercase font-heading transition-colors duration-300",
-              isCompleted ? "text-emerald-500" : "text-blue-500",
-            )}
-          >
-            {isCompleted ? "Completed" : "Active"}
-          </span>
-        </div>
-        <h1 className="text-[28px] md:text-[32px] font-semibold text-[var(--ds-ink)] tracking-tight leading-tight font-heading">
-          Qodo Review
+    <motion.div
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
+      className="flex flex-col max-w-[840px]"
+    >
+      {/* Header */}
+      <div className="flex flex-col gap-2 mb-8">
+        <h1 className="text-[26px] md:text-[30px] font-semibold text-[var(--ds-ink)] tracking-tight leading-tight font-heading">
+          Repair
         </h1>
-        <p className="text-[14px] text-[var(--ds-ink-subtle)] leading-relaxed mt-1 max-w-[680px]">
-          {isCompleted
-            ? "No blocking issues found. The pull request is ready for human merge."
-            : "Reviewing the pull request for correctness, regressions, and risk."}
+        <p className="text-[13px] text-[var(--ds-ink-subtle)] leading-relaxed max-w-[680px]">
+          {isRunning
+            ? "Preparing a focused candidate patch based on the identified bottleneck."
+            : "Candidate repair prepared for validation."}
         </p>
       </div>
 
-      <motion.div
-        layout
-        className="flex flex-col border border-[var(--ds-hairline)] bg-[var(--ds-surface-1)] rounded-[8px] overflow-hidden mb-8 shadow-sm"
-      >
-        {/* QODO REVIEW HEADER */}
-        <div className="flex flex-col p-5 md:p-6 border-b border-[var(--ds-hairline)] bg-[var(--ds-surface-1)]">
-          <span className="text-[10px] font-bold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading mb-4 block">
-            Qodo Review
+      {/* Horizontal Repair Summary */}
+      <div className="flex flex-col mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 rounded-[8px] border border-[var(--ds-hairline)] bg-[var(--ds-canvas)] text-[12px]">
+          {repair?.strategy && (
+            <div className="flex flex-col gap-1">
+              <span className="text-[10px] font-bold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading">
+                Strategy
+              </span>
+              <span className="font-mono text-[var(--ds-ink)] truncate">{repair.strategy}</span>
+            </div>
+          )}
+          <div className="flex flex-col gap-1">
+            <span className="text-[10px] font-bold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading">
+              Files
+            </span>
+            <span className="font-mono text-[var(--ds-ink)]">{filesChangedCount} changed</span>
+          </div>
+          {repair?.riskSurface && (
+            <div className="flex flex-col gap-1">
+              <span className="text-[10px] font-bold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading">
+                Risk
+              </span>
+              <span className="font-mono text-[var(--ds-ink)]">{repair.riskSurface}</span>
+            </div>
+          )}
+          <div className="flex flex-col gap-1 col-span-2 md:col-span-1">
+            <span className="text-[10px] font-bold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading">
+              Target
+            </span>
+            <span className="font-mono text-[var(--ds-ink)] truncate">
+              {patches[0]?.path || target?.endpoint || "src/orders/process.ts"}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Root Cause */}
+      <div className="flex flex-col mb-6">
+        <span className="text-[10px] font-bold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading mb-2.5">
+          Root Cause
+        </span>
+        <div className="p-4 rounded-[8px] border border-[var(--ds-hairline)] bg-[var(--ds-canvas)]">
+          <p className="text-[13px] text-[var(--ds-ink)] leading-relaxed">
+            {rootCause}
+          </p>
+        </div>
+      </div>
+
+      {/* Changed Files with FileDiff components */}
+      <div className="flex flex-col mb-6">
+        <div className="flex items-center justify-between mb-3">
+          <span className="text-[10px] font-bold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading">
+            Changed Files
           </span>
-          <span className="text-[15px] font-semibold text-[var(--ds-ink)] mb-1 block">
-            Analyzing #42 · {prTitle || "Fix Node.js event-loop starvation"}
+          <span className="text-[11px] font-mono text-[var(--ds-ink-subtle)]">
+            {filesChangedCount} {filesChangedCount === 1 ? "file" : "files"}
           </span>
         </div>
 
-        {!isCompleted ? (
-          <div className="flex flex-col md:flex-row divide-y md:divide-y-0 md:divide-x divide-[var(--ds-hairline)]">
-            {/* REVIEW CHECKS */}
-            <div className="flex flex-col p-5 md:p-6 flex-1 bg-[var(--ds-canvas)]">
+        <div className="flex flex-col gap-3">
+          {patches.map((file, i) => (
+            <motion.div
+              key={file.path}
+              initial={{ opacity: 0, y: 4 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.2, delay: i * 0.04 }}
+            >
+              <FileDiff
+                file={file.path}
+                lines={file.lines}
+                open={!!expandedFiles[file.path]}
+                onOpenChange={(next) =>
+                  setExpandedFiles((prev) => ({ ...prev, [file.path]: next }))
+                }
+                status={isRunning ? "streaming" : "complete"}
+                collapseOnComplete={false}
+                copyText={file.lines
+                  .map((l) => `${l.type === "added" ? "+" : l.type === "removed" ? "-" : " "} ${l.content}`)
+                  .join("\n")}
+                maxHeight={320}
+              />
+            </motion.div>
+          ))}
+        </div>
+      </div>
+
+      {/* Change Summary & Why This Repair */}
+      <div className="flex flex-col mb-8 pt-1">
+        <div className="flex items-center gap-3 text-[12px] font-mono text-[var(--ds-ink-subtle)]">
+          <span>{filesChangedCount} files changed</span>
+          <span className="text-[var(--ds-hairline-strong)]">·</span>
+          <span className="text-emerald-500">+{totalAdded} additions</span>
+          <span className="text-[var(--ds-hairline-strong)]">·</span>
+          <span className="text-red-500">−{totalRemoved} deletions</span>
+        </div>
+
+        <WhyThisRepairDisclosure
+          reason={repair?.description || diagnosis?.primaryFinding?.cause}
+          strategy={repair?.strategy}
+        />
+      </div>
+
+      {/* Primary Action Button */}
+      <div className="pt-0">
+        <Button
+          onClick={() => onStageSelect("candidate_test")}
+          disabled={isRunning}
+          className="h-9 px-5 text-[13px] font-medium bg-[var(--ds-primary)] text-[var(--ds-on-primary)] hover:bg-[var(--ds-primary-hover)] gap-2 border-0 shadow-sm disabled:opacity-50"
+        >
+          Run candidate test <ArrowRight className="h-3.5 w-3.5" />
+        </Button>
+      </div>
+    </motion.div>
+  );
+}
+
+/* ============================================================
+   STAGE 6: Candidate test (candidate_test)
+   ============================================================ */
+
+function CandidateTestStage({
+  data,
+  onStageSelect,
+  investigationStatus = "completed",
+}: {
+  data: any;
+  onStageSelect: (id: string) => void;
+  investigationStatus?: InvestigationStatus;
+}) {
+  const { baseline, verification, target, sandbox, reproduction, configuration } = data;
+  const bm = baseline?.metrics;
+  const vm = verification?.metrics;
+
+  const isRunning = investigationStatus === "running" && data?.status === "candidate_testing";
+  const isFailed = investigationStatus === "failed";
+  const isPaused = investigationStatus === "paused" || investigationStatus === "pausing";
+
+  const targetEndpoint = target ? `${target.method} ${target.endpoint}` : "POST /orders/process";
+  const requestsPerSec = reproduction?.workload?.requestsPerSecond || configuration?.workload?.requestsPerSecond || 100;
+  const durationSec = reproduction?.workload?.durationSeconds || 30;
+  const sandboxId = sandbox?.id || "daytona-7f2a";
+
+  const comparisons = [
+    {
+      label: "99th Event-Loop Delay",
+      before: `${bm?.eventLoopP99?.value?.toLocaleString() || "4,217"} ${bm?.eventLoopP99?.unit || "ms"}`,
+      after: `${vm?.eventLoopP99?.after ?? 3.2} ${vm?.eventLoopP99?.unit || "ms"}`,
+      delta: "↓ 99.9%",
+      improved: vm?.eventLoopP99?.passed ?? true,
+    },
+    {
+      label: "99th Endpoint Latency",
+      before: `${bm?.endpointP99?.value?.toLocaleString() || "5,102"} ${bm?.endpointP99?.unit || "ms"}`,
+      after: `${vm?.endpointP99?.after ?? 52} ${vm?.endpointP99?.unit || "ms"}`,
+      delta: "↓ 99.0%",
+      improved: vm?.endpointP99?.passed ?? true,
+    },
+    {
+      label: "Health Availability",
+      before: `${bm?.healthAvailability?.value ?? 16}${bm?.healthAvailability?.unit || "%"}`,
+      after: `${vm?.healthAvailability?.after ?? 100}${vm?.healthAvailability?.unit || "%"}`,
+      delta: "↑ +84%",
+      improved: vm?.healthAvailability?.passed ?? true,
+    },
+    {
+      label: "Requests / sec",
+      before: `${requestsPerSec}`,
+      after: `${requestsPerSec}`,
+      delta: "Maintained",
+      neutral: true,
+    },
+    {
+      label: "Functional Tests",
+      before: `${bm?.functionalTests?.passed ?? 100} / ${bm?.functionalTests?.total ?? 100}`,
+      after: `${vm?.functionalTests?.after ?? 100} / ${vm?.functionalTests?.total ?? 100}`,
+      delta: "100% passed",
+      improved: true,
+    },
+  ];
+
+  if (isFailed) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 6 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
+        className="flex flex-col max-w-[840px]"
+      >
+        <div className="flex flex-col gap-1.5 mb-8">
+          <span className="text-[10px] font-bold tracking-widest text-red-500 uppercase font-heading">
+            Test Failed
+          </span>
+          <h1 className="text-[26px] md:text-[30px] font-semibold text-[var(--ds-ink)] tracking-tight leading-tight font-heading">
+            Candidate test failed
+          </h1>
+          <p className="text-[13px] text-[var(--ds-ink-subtle)] leading-relaxed max-w-[680px]">
+            AEGIS could not complete the repaired candidate workload in the sandbox.
+          </p>
+        </div>
+
+        <div className="pt-0">
+          <Button
+            onClick={() => onStageSelect("candidate_test")}
+            className="h-9 px-5 text-[13px] font-medium bg-[var(--ds-primary)] text-[var(--ds-on-primary)] hover:bg-[var(--ds-primary-hover)] gap-2 border-0 shadow-sm"
+          >
+            Retry candidate test <RotateCcw className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      </motion.div>
+    );
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
+      className="flex flex-col max-w-[840px]"
+    >
+      {/* Header */}
+      <div className="flex flex-col gap-2 mb-8">
+        <h1 className="text-[26px] md:text-[30px] font-semibold text-[var(--ds-ink)] tracking-tight leading-tight font-heading">
+          Candidate test
+        </h1>
+        <p className="text-[13px] text-[var(--ds-ink-subtle)] leading-relaxed max-w-[680px]">
+          {isRunning
+            ? "AEGIS is rerunning the original workload against the repaired candidate in a fresh sandbox."
+            : "AEGIS reran the original workload against the repaired candidate in a fresh sandbox."}
+        </p>
+      </div>
+
+      {/* Execution Context & Guarantees */}
+      <div className="flex flex-col mb-6 p-4 rounded-[8px] border border-[var(--ds-hairline)] bg-[var(--ds-canvas)] gap-3.5">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
+          <div className="flex flex-col gap-1">
+            <span className="text-[10px] font-bold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading">
+              Workload Target
+            </span>
+            <span className="font-mono text-[14px] font-semibold text-[var(--ds-ink)]">
+              {targetEndpoint}
+            </span>
+          </div>
+          <div className="flex items-center gap-2 text-[12px] font-mono text-[var(--ds-ink-subtle)]">
+            <span>{requestsPerSec} req/s</span>
+            <span className="text-[var(--ds-hairline-strong)]">·</span>
+            <span>{durationSec}s</span>
+            <span className="text-[var(--ds-hairline-strong)]">·</span>
+            <span>Fresh sandbox ({sandboxId})</span>
+          </div>
+        </div>
+
+        <div className="border-t border-[var(--ds-hairline)] pt-3 flex items-center flex-wrap gap-x-4 gap-y-2 text-[11px] font-medium text-[var(--ds-ink-subtle)]">
+          <div className="flex items-center gap-1.5">
+            <Check className="h-3.5 w-3.5 text-emerald-500" strokeWidth={2.5} />
+            <span>Same workload</span>
+          </div>
+          <span className="text-[var(--ds-hairline-strong)]">·</span>
+          <div className="flex items-center gap-1.5">
+            <Check className="h-3.5 w-3.5 text-emerald-500" strokeWidth={2.5} />
+            <span>Fresh sandbox</span>
+          </div>
+          <span className="text-[var(--ds-hairline-strong)]">·</span>
+          <div className="flex items-center gap-1.5">
+            <Check className="h-3.5 w-3.5 text-emerald-500" strokeWidth={2.5} />
+            <span>Deterministic</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Running State Surface */}
+      {isRunning && (
+        <motion.div
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: "auto" }}
+          className="flex flex-col mb-6 p-4 rounded-[8px] border border-amber-500/20 bg-amber-500/[0.04]"
+        >
+          <div className="flex items-center gap-2 mb-3">
+            <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
+            <span className="text-[11px] font-bold tracking-wider text-amber-500 uppercase font-heading">
+              RUNNING CANDIDATE TEST
+            </span>
+          </div>
+          <div className="grid grid-cols-3 gap-4 text-[12px] font-mono">
+            <div className="flex flex-col gap-0.5">
+              <span className="text-[10px] uppercase text-[var(--ds-ink-tertiary)] font-sans">Requests</span>
+              <span className="text-[var(--ds-ink)]">{requestsPerSec} / {requestsPerSec} req/s</span>
+            </div>
+            <div className="flex flex-col gap-0.5">
+              <span className="text-[10px] uppercase text-[var(--ds-ink-tertiary)] font-sans">Elapsed</span>
+              <span className="text-[var(--ds-ink)]">18s / {durationSec}s</span>
+            </div>
+            <div className="flex flex-col gap-0.5">
+              <span className="text-[10px] uppercase text-[var(--ds-ink-tertiary)] font-sans">Sandbox</span>
+              <span className="text-[var(--ds-ink)] truncate">{sandboxId}</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 mt-3 pt-3 border-t border-amber-500/10 text-[11px] text-amber-500/80">
+            <Loader2 className="h-3 w-3 animate-spin shrink-0" />
+            <span>Collecting candidate measurements…</span>
+          </div>
+        </motion.div>
+      )}
+
+      {/* Paused State Surface */}
+      {isPaused && (
+        <div className="flex items-center gap-2.5 mb-6 p-3.5 rounded-[8px] border border-[var(--ds-hairline)] bg-[var(--ds-surface-1)] text-[12px] text-[var(--ds-ink-subtle)]">
+          <Pause className="h-4 w-4 text-[var(--ds-ink-tertiary)] shrink-0" />
+          <span>Candidate test is paused. Current measurements are preserved.</span>
+        </div>
+      )}
+
+      {/* Candidate Results Grid */}
+      <div className="flex flex-col mb-6">
+        <span className="text-[10px] font-bold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading mb-3">
+          Candidate Results
+        </span>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 rounded-[8px] border border-[var(--ds-hairline)] bg-[var(--ds-canvas)] text-[12px]">
+          <div className="flex flex-col gap-1">
+            <span className="text-[10px] font-bold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading">
+              99th Event Loop
+            </span>
+            <div className="flex items-baseline gap-1.5">
+              <span className="font-mono text-[14px] font-semibold text-emerald-500">
+                {vm?.eventLoopP99?.after ?? 3.2} ms
+              </span>
+              <span className="text-[10px] text-[var(--ds-ink-tertiary)] font-mono">&lt; 52 ms</span>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <span className="text-[10px] font-bold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading">
+              99th Latency
+            </span>
+            <div className="flex items-baseline gap-1.5">
+              <span className="font-mono text-[14px] font-semibold text-emerald-500">
+                {vm?.endpointP99?.after ?? 52} ms
+              </span>
+              <span className="text-[10px] text-[var(--ds-ink-tertiary)] font-mono">&lt; 100 ms</span>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <span className="text-[10px] font-bold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading">
+              Availability
+            </span>
+            <div className="flex items-baseline gap-1.5">
+              <span className="font-mono text-[14px] font-semibold text-emerald-500">
+                {vm?.healthAvailability?.after ?? 100}%
+              </span>
+              <span className="text-[10px] text-[var(--ds-ink-tertiary)] font-mono">100%</span>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <span className="text-[10px] font-bold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading">
+              Functional
+            </span>
+            <div className="flex items-baseline gap-1.5">
+              <span className="font-mono text-[14px] font-semibold text-[var(--ds-ink)]">
+                {vm?.functionalTests?.after ?? 100} / {vm?.functionalTests?.total ?? 100}
+              </span>
+              <span className="text-[10px] text-emerald-500 font-mono">passed</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Comparison Table: Baseline -> Candidate */}
+      <div className="flex flex-col mb-6">
+        <div className="flex items-center justify-between mb-3">
+          <span className="text-[10px] font-bold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading">
+            Baseline → Candidate
+          </span>
+          <span className="text-[11px] font-mono text-[var(--ds-ink-subtle)]">
+            Same Workload Comparison
+          </span>
+        </div>
+
+        <div className="flex flex-col rounded-[8px] border border-[var(--ds-hairline)] bg-[var(--ds-canvas)] overflow-hidden">
+          {/* Header */}
+          <div className="grid grid-cols-12 px-4 py-2.5 border-b border-[var(--ds-hairline)] bg-[var(--ds-surface-1)] text-[10px] font-bold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading">
+            <span className="col-span-4">Metric</span>
+            <span className="col-span-3 text-right">Baseline</span>
+            <span className="col-span-3 text-right">Candidate</span>
+            <span className="col-span-2 text-right">Delta</span>
+          </div>
+
+          {/* Rows */}
+          {comparisons.map((c, i) => (
+            <motion.div
+              key={c.label}
+              initial={{ opacity: 0, x: -4 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.2, delay: i * 0.04 }}
+              className="grid grid-cols-12 px-4 py-3 border-b border-[var(--ds-hairline)] last:border-0 text-[12px] items-center"
+            >
+              <span className="col-span-4 font-medium text-[var(--ds-ink)]">{c.label}</span>
+              <span className="col-span-3 text-right font-mono text-[var(--ds-ink-subtle)] line-through decoration-[var(--ds-ink-tertiary)]">
+                {c.before}
+              </span>
+              <span
+                className={cn(
+                  "col-span-3 text-right font-mono font-medium",
+                  c.improved ? "text-emerald-500" : "text-[var(--ds-ink)]"
+                )}
+              >
+                {c.after}
+              </span>
+              <span
+                className={cn(
+                  "col-span-2 text-right font-mono text-[11px]",
+                  c.improved
+                    ? "text-emerald-500 font-medium"
+                    : c.neutral
+                    ? "text-[var(--ds-ink-subtle)]"
+                    : "text-red-500"
+                )}
+              >
+                {c.delta}
+              </span>
+            </motion.div>
+          ))}
+        </div>
+      </div>
+
+      {/* Result Interpretation & Readiness */}
+      <div className="flex flex-col mb-8 p-4 rounded-[8px] border border-[var(--ds-hairline)] bg-[var(--ds-canvas)] gap-2">
+        <div className="flex flex-col gap-1.5">
+          <div className="flex items-center gap-2 text-[13px] font-medium text-[var(--ds-ink)]">
+            <Check className="h-4 w-4 text-emerald-500" strokeWidth={2.5} />
+            <span>Candidate improved performance under the same workload.</span>
+          </div>
+          <div className="flex items-center gap-2 text-[13px] font-medium text-[var(--ds-ink)]">
+            <Check className="h-4 w-4 text-emerald-500" strokeWidth={2.5} />
+            <span>Functional behavior preserved (100% tests passed).</span>
+          </div>
+        </div>
+
+        <div className="mt-2 pt-3 border-t border-[var(--ds-hairline)] flex flex-col gap-0.5">
+          <span className="text-[10px] font-bold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading">
+            Ready for Verification
+          </span>
+          <span className="text-[12px] text-[var(--ds-ink-subtle)]">
+            Candidate measurements have been captured and can now be verified deterministically against baseline telemetry.
+          </span>
+        </div>
+      </div>
+
+      {/* Primary Action Button */}
+      <div className="pt-0">
+        <Button
+          onClick={() => onStageSelect("verification")}
+          disabled={isRunning}
+          className="h-9 px-5 text-[13px] font-medium bg-[var(--ds-primary)] text-[var(--ds-on-primary)] hover:bg-[var(--ds-primary-hover)] gap-2 border-0 shadow-sm disabled:opacity-50"
+        >
+          View verification <ArrowRight className="h-3.5 w-3.5" />
+        </Button>
+      </div>
+    </motion.div>
+  );
+}
+
+/* ============================================================
+   STAGE 7: Verification (verification)
+   ============================================================ */
+
+function VerificationStage({
+  data,
+  onStageSelect,
+  repairAttempt,
+  maxAttempts,
+  investigationStatus = "completed",
+}: {
+  data: any;
+  onStageSelect: (id: string) => void;
+  repairAttempt: number;
+  maxAttempts: number;
+  investigationStatus?: InvestigationStatus;
+}) {
+  const { baseline, verification, target, sandbox, reproduction, configuration } = data;
+  const bm = baseline?.metrics;
+  const vm = verification?.metrics;
+
+  const isRunning = investigationStatus === "running" && data?.status === "verifying";
+  const isFailed = investigationStatus === "failed";
+  const isPaused = investigationStatus === "paused" || investigationStatus === "pausing";
+
+  const targetEndpoint = target ? `${target.method} ${target.endpoint}` : "POST /orders/process";
+  const requestsPerSec = reproduction?.workload?.requestsPerSecond || configuration?.workload?.requestsPerSecond || 100;
+  const durationSec = reproduction?.workload?.durationSeconds || 30;
+  const sandboxId = sandbox?.id || "daytona-7f2a";
+
+  const comparisons = [
+    {
+      label: "Event-loop P99",
+      before: `${bm?.eventLoopP99?.value?.toLocaleString() || "4,217"} ${bm?.eventLoopP99?.unit || "ms"}`,
+      after: `${vm?.eventLoopP99?.after ?? 3.2} ${vm?.eventLoopP99?.unit || "ms"}`,
+      delta: "−99.9%",
+      improved: vm?.eventLoopP99?.passed ?? true,
+    },
+    {
+      label: "Health availability",
+      before: `${bm?.healthAvailability?.value ?? 16}${bm?.healthAvailability?.unit || "%"}`,
+      after: `${vm?.healthAvailability?.after ?? 100}${vm?.healthAvailability?.unit || "%"}`,
+      delta: "+84%",
+      improved: vm?.healthAvailability?.passed ?? true,
+    },
+    {
+      label: "Endpoint P99",
+      before: `${bm?.endpointP99?.value?.toLocaleString() || "5,102"} ${bm?.endpointP99?.unit || "ms"}`,
+      after: `${vm?.endpointP99?.after ?? 52} ${vm?.endpointP99?.unit || "ms"}`,
+      delta: "−99.0%",
+      improved: vm?.endpointP99?.passed ?? true,
+    },
+    {
+      label: "Functional tests",
+      before: `${bm?.functionalTests?.passed ?? 100} / ${bm?.functionalTests?.total ?? 100}`,
+      after: `${vm?.functionalTests?.after ?? 100} / ${vm?.functionalTests?.total ?? 100}`,
+      delta: "100% passed",
+      improved: true,
+    },
+  ];
+
+  if (isFailed) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 6 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
+        className="flex flex-col max-w-[840px]"
+      >
+        <div className="flex flex-col gap-1.5 mb-8">
+          <span className="text-[10px] font-bold tracking-widest text-red-500 uppercase font-heading">
+            Verification Failed
+          </span>
+          <h1 className="text-[26px] md:text-[30px] font-semibold text-[var(--ds-ink)] tracking-tight leading-tight font-heading">
+            Verification failed
+          </h1>
+          <p className="text-[13px] text-[var(--ds-ink-subtle)] leading-relaxed max-w-[680px]">
+            The candidate repair did not pass deterministic verification under the original workload.
+          </p>
+        </div>
+
+        <div className="pt-0">
+          <Button
+            onClick={() => onStageSelect("candidate_test")}
+            className="h-9 px-5 text-[13px] font-medium bg-[var(--ds-primary)] text-[var(--ds-on-primary)] hover:bg-[var(--ds-primary-hover)] gap-2 border-0 shadow-sm"
+          >
+            Retry candidate <RotateCcw className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      </motion.div>
+    );
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
+      className="flex flex-col max-w-[840px]"
+    >
+      {/* Header */}
+      <div className="flex flex-col gap-2 mb-8">
+        <h1 className="text-[26px] md:text-[30px] font-semibold text-[var(--ds-ink)] tracking-tight leading-tight font-heading">
+          Verification
+        </h1>
+        <p className="text-[13px] text-[var(--ds-ink-subtle)] leading-relaxed max-w-[680px]">
+          {isRunning
+            ? "AEGIS is running the original workload in a fresh sandbox."
+            : "AEGIS reran the same workload against the repaired candidate and compared the result with the original baseline."}
+        </p>
+      </div>
+
+      {/* Running State Surface */}
+      {isRunning ? (
+        <div className="flex flex-col mb-8 p-5 rounded-[8px] border border-amber-500/20 bg-amber-500/[0.04] gap-4">
+          <div className="flex items-center gap-2">
+            <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
+            <span className="text-[11px] font-bold tracking-wider text-amber-500 uppercase font-heading">
+              RUNNING DETERMINISTIC VERIFICATION
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-[12px] font-mono">
+            <div className="flex flex-col gap-1">
+              <span className="text-[10px] uppercase font-sans text-[var(--ds-ink-tertiary)]">Target</span>
+              <span className="text-[var(--ds-ink)] font-semibold">{targetEndpoint}</span>
+            </div>
+            <div className="flex flex-col gap-1">
+              <span className="text-[10px] uppercase font-sans text-[var(--ds-ink-tertiary)]">Workload</span>
+              <span className="text-[var(--ds-ink)]">{requestsPerSec} req/s · {durationSec}s</span>
+            </div>
+            <div className="flex flex-col gap-1">
+              <span className="text-[10px] uppercase font-sans text-[var(--ds-ink-tertiary)]">Environment</span>
+              <span className="text-[var(--ds-ink)]">Fresh sandbox ({sandboxId})</span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 pt-3 border-t border-amber-500/10 text-[11px] text-amber-500/80">
+            <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0" />
+            <span>Running deterministic verification…</span>
+          </div>
+        </div>
+      ) : (
+        <>
+          {/* Paused State Surface */}
+          {isPaused && (
+            <div className="flex items-center gap-2.5 mb-6 p-3.5 rounded-[8px] border border-[var(--ds-hairline)] bg-[var(--ds-surface-1)] text-[12px] text-[var(--ds-ink-subtle)]">
+              <Pause className="h-4 w-4 text-[var(--ds-ink-tertiary)] shrink-0" />
+              <span>Verification is paused. Current results are preserved.</span>
+            </div>
+          )}
+
+          {/* Before -> After Comparison Table */}
+          <div className="flex flex-col mb-6">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-[10px] font-bold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading">
+                Before → After
+              </span>
+              <span className="text-[11px] font-mono text-[var(--ds-ink-subtle)]">
+                Deterministic Workload Evidence
+              </span>
+            </div>
+
+            <div className="flex flex-col rounded-[8px] border border-[var(--ds-hairline)] bg-[var(--ds-canvas)] overflow-hidden">
+              {/* Header */}
+              <div className="grid grid-cols-12 px-4 py-2.5 border-b border-[var(--ds-hairline)] bg-[var(--ds-surface-1)] text-[10px] font-bold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading">
+                <span className="col-span-4">Metric</span>
+                <span className="col-span-3 text-right">Before (Baseline)</span>
+                <span className="col-span-3 text-right">After (Candidate)</span>
+                <span className="col-span-2 text-right">Delta</span>
+              </div>
+
+              {/* Rows */}
+              {comparisons.map((c, i) => (
+                <motion.div
+                  key={c.label}
+                  initial={{ opacity: 0, x: -4 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.2, delay: i * 0.04 }}
+                  className="grid grid-cols-12 px-4 py-3 border-b border-[var(--ds-hairline)] last:border-0 text-[12px] items-center"
+                >
+                  <span className="col-span-4 font-medium text-[var(--ds-ink)]">{c.label}</span>
+                  <span className="col-span-3 text-right font-mono text-[var(--ds-ink-subtle)] line-through decoration-[var(--ds-ink-tertiary)]">
+                    {c.before}
+                  </span>
+                  <span
+                    className={cn(
+                      "col-span-3 text-right font-mono font-medium",
+                      c.improved ? "text-emerald-500" : "text-[var(--ds-ink)]"
+                    )}
+                  >
+                    {c.after}
+                  </span>
+                  <span className="col-span-2 text-right font-mono text-[11px] text-emerald-500 font-medium">
+                    {c.delta}
+                  </span>
+                </motion.div>
+              ))}
+            </div>
+          </div>
+
+          {/* Verification Evidence Summary */}
+          <div className="flex flex-col mb-6 p-4 rounded-[8px] border border-[var(--ds-hairline)] bg-[var(--ds-canvas)] gap-2">
+            <span className="text-[10px] font-bold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading mb-1">
+              Verification Outcomes
+            </span>
+            <div className="flex flex-col gap-1.5 text-[13px] text-[var(--ds-ink)]">
+              <div className="flex items-center gap-2">
+                <Check className="h-4 w-4 text-emerald-500 shrink-0" strokeWidth={2.5} />
+                <span>Performance improved under concurrent load</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Check className="h-4 w-4 text-emerald-500 shrink-0" strokeWidth={2.5} />
+                <span>Health availability recovered to 100%</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Check className="h-4 w-4 text-emerald-500 shrink-0" strokeWidth={2.5} />
+                <span>Functional behavior preserved across test suite</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Test & Repair Metadata Summary */}
+          <div className="grid grid-cols-3 gap-4 p-4 rounded-[8px] border border-[var(--ds-hairline)] bg-[var(--ds-canvas)] text-[12px] mb-8">
+            <div className="flex flex-col gap-1">
+              <span className="text-[10px] font-bold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading">
+                Functional tests
+              </span>
+              <span className="font-mono text-[var(--ds-ink)]">
+                {vm?.functionalTests?.after ?? 100} / {vm?.functionalTests?.total ?? 100} passed
+              </span>
+            </div>
+            <div className="flex flex-col gap-1">
+              <span className="text-[10px] font-bold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading">
+                Regression checks
+              </span>
+              <span className="font-mono text-emerald-500">Passed</span>
+            </div>
+            <div className="flex flex-col gap-1">
+              <span className="text-[10px] font-bold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading">
+                Repair attempts
+              </span>
+              <span className="font-mono text-[var(--ds-ink)]">
+                {repairAttempt} / {maxAttempts}
+              </span>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Primary Action Button */}
+      <div className="pt-0">
+        <Button
+          onClick={() => onStageSelect("human_gate")}
+          disabled={isRunning}
+          className="h-9 px-5 text-[13px] font-medium bg-[var(--ds-primary)] text-[var(--ds-on-primary)] hover:bg-[var(--ds-primary-hover)] gap-2 border-0 shadow-sm disabled:opacity-50"
+        >
+          Review decision <ArrowRight className="h-3.5 w-3.5" />
+        </Button>
+      </div>
+    </motion.div>
+  );
+}
+
+/* ============================================================
+   STAGE 8: Human gate (human_gate)
+   ============================================================ */
+
+function HumanDecisionStage({
+  data,
+  onStageSelect,
+  repairAttempt,
+  maxAttempts,
+  onRetry,
+  onReject,
+}: {
+  data: any;
+  onStageSelect: (id: string) => void;
+  repairAttempt: number;
+  maxAttempts: number;
+  onRetry: () => void;
+  onReject: () => void;
+}) {
+  const { baseline, verification, repair } = data;
+  const bm = baseline?.metrics;
+  const vm = verification?.metrics;
+
+  const [isAccepting, setIsAccepting] = useState(false);
+  const [gitStep, setGitStep] = useState(0);
+
+  const gitSteps = [
+    { name: "Accepting repair", status: "Approval recorded" },
+    { name: "Writing approved changes", status: "2 files modified" },
+    { name: "Creating branch", status: "aegis/fix-a91f" },
+    { name: "Creating commit", status: "8d3c1f2" },
+    { name: "Creating pull request", status: "Opening PR #42" },
+    { name: "Pull request created", status: "PR #42 ready" },
+  ];
+
+  const handleAccept = () => {
+    setIsAccepting(true);
+    const intervals = [400, 900, 1400, 1900, 2400, 2900];
+    intervals.forEach((delay, index) => {
+      setTimeout(() => {
+        setGitStep(index + 1);
+        if (index === intervals.length - 1) {
+          setTimeout(() => {
+            onStageSelect("pull_request");
+          }, 350);
+        }
+      }, delay);
+    });
+  };
+
+  const retryDisabled = repairAttempt >= maxAttempts;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
+      className="flex flex-col max-w-[840px]"
+    >
+      {/* Header */}
+      <div className="flex flex-col gap-1.5 mb-8">
+        <span className="text-[10px] font-bold tracking-widest text-amber-500 uppercase font-heading">
+          WAITING FOR YOU
+        </span>
+        <h1 className="text-[26px] md:text-[30px] font-semibold text-[var(--ds-ink)] tracking-tight leading-tight font-heading">
+          Human gate
+        </h1>
+        <p className="text-[13px] text-[var(--ds-ink-subtle)] leading-relaxed max-w-[680px]">
+          The repair has been verified. Review the result and choose what happens next.
+        </p>
+      </div>
+
+      {/* Verified Result Summary */}
+      <div className="flex flex-col mb-6 p-4 rounded-[8px] border border-[var(--ds-hairline)] bg-[var(--ds-canvas)]">
+        <span className="text-[10px] font-bold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading mb-3 block">
+          Verified Result
+        </span>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-[12px]">
+          <div className="flex flex-col gap-0.5">
+            <span className="text-[10px] uppercase font-sans text-[var(--ds-ink-tertiary)]">Event-loop P99</span>
+            <div className="flex items-center gap-1.5 font-mono text-[13px]">
+              <span className="text-[var(--ds-ink-subtle)] line-through text-[11px]">{bm?.eventLoopP99?.value || 4217} ms</span>
+              <span className="text-[var(--ds-ink-tertiary)]">→</span>
+              <span className="text-emerald-500 font-semibold">{vm?.eventLoopP99?.after ?? 3.2} ms</span>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-0.5">
+            <span className="text-[10px] uppercase font-sans text-[var(--ds-ink-tertiary)]">Availability</span>
+            <div className="flex items-center gap-1.5 font-mono text-[13px]">
+              <span className="text-[var(--ds-ink-subtle)] line-through text-[11px]">{bm?.healthAvailability?.value ?? 16}%</span>
+              <span className="text-[var(--ds-ink-tertiary)]">→</span>
+              <span className="text-emerald-500 font-semibold">{vm?.healthAvailability?.after ?? 100}%</span>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-0.5">
+            <span className="text-[10px] uppercase font-sans text-[var(--ds-ink-tertiary)]">Endpoint P99</span>
+            <div className="flex items-center gap-1.5 font-mono text-[13px]">
+              <span className="text-[var(--ds-ink-subtle)] line-through text-[11px]">{bm?.endpointP99?.value || 5102} ms</span>
+              <span className="text-[var(--ds-ink-tertiary)]">→</span>
+              <span className="text-emerald-500 font-semibold">{vm?.endpointP99?.after ?? 52} ms</span>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-0.5">
+            <span className="text-[10px] uppercase font-sans text-[var(--ds-ink-tertiary)]">Functional Tests</span>
+            <div className="flex items-center gap-1.5 font-mono text-[13px]">
+              <span className="text-emerald-500 font-semibold">{vm?.functionalTests?.after ?? 100} / {vm?.functionalTests?.total ?? 100}</span>
+              <span className="text-[10px] text-emerald-500">passed</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Repair Metadata */}
+      <div className="flex flex-col mb-6 p-4 rounded-[8px] border border-[var(--ds-hairline)] bg-[var(--ds-canvas)]">
+        <span className="text-[10px] font-bold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading mb-3 block">
+          Repair Summary
+        </span>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-[12px] font-mono">
+          <div className="flex flex-col gap-0.5">
+            <span className="text-[10px] font-sans text-[var(--ds-ink-tertiary)]">Strategy</span>
+            <span className="text-[var(--ds-ink)]">{repair?.strategy || "Worker offload"}</span>
+          </div>
+          <div className="flex flex-col gap-0.5">
+            <span className="text-[10px] font-sans text-[var(--ds-ink-tertiary)]">Files changed</span>
+            <span className="text-[var(--ds-ink)]">{repair?.filesChanged || 2}</span>
+          </div>
+          <div className="flex flex-col gap-0.5">
+            <span className="text-[10px] font-sans text-[var(--ds-ink-tertiary)]">Tests</span>
+            <span className="text-emerald-500">100 / 100</span>
+          </div>
+          <div className="flex flex-col gap-0.5">
+            <span className="text-[10px] font-sans text-[var(--ds-ink-tertiary)]">Repair attempts</span>
+            <span className="text-[var(--ds-ink)]">{repairAttempt} / {maxAttempts}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* GitHub Safety Boundary */}
+      <div className="flex items-center gap-3 p-4 rounded-[8px] border border-[var(--ds-hairline)] bg-[var(--ds-surface-1)] text-[12px] mb-8">
+        <Lock className="h-4 w-4 text-amber-500 shrink-0" />
+        <span className="text-[var(--ds-ink-subtle)] leading-relaxed">
+          <span className="text-[var(--ds-ink)] font-medium">GitHub has not been modified.</span> Approval is required before AEGIS writes changes to GitHub.
+        </span>
+      </div>
+
+      {/* Decision Card with Expandable Downward Action Flow */}
+      <motion.div
+        layout
+        className="flex flex-col rounded-[8px] border border-[var(--ds-hairline)] bg-[var(--ds-canvas)] overflow-hidden"
+      >
+        <div className="flex items-center justify-between p-4 md:p-5">
+          <div className="flex items-center gap-3">
+            <Button
+              onClick={onReject}
+              disabled={isAccepting}
+              variant="ghost"
+              className="h-9 px-4 text-[13px] font-medium text-red-500 hover:text-red-400 hover:bg-red-500/10 disabled:opacity-40"
+            >
+              Reject changes
+            </Button>
+            <Button
+              onClick={onRetry}
+              disabled={retryDisabled || isAccepting}
+              variant="outline"
+              className="h-9 px-4 text-[13px] font-medium border-[var(--ds-hairline)] bg-[var(--ds-surface-1)] hover:bg-[var(--ds-surface-2)] disabled:opacity-40"
+            >
+              <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
+              Retry repair
+              {retryDisabled && (
+                <span className="text-[11px] text-[var(--ds-ink-tertiary)] ml-1">(max reached)</span>
+              )}
+            </Button>
+          </div>
+
+          <Button
+            onClick={handleAccept}
+            disabled={isAccepting}
+            className="h-9 px-5 text-[13px] font-medium bg-[var(--ds-primary)] text-[var(--ds-on-primary)] hover:bg-[var(--ds-primary-hover)] gap-2 border-0 shadow-sm disabled:opacity-50"
+          >
+            {isAccepting ? (
+              <>
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                Applying to GitHub…
+              </>
+            ) : (
+              <>
+                Accept changes <ArrowRight className="h-3.5 w-3.5" />
+              </>
+            )}
+          </Button>
+        </div>
+
+        {/* Downward Expansion during Accept */}
+        <AnimatePresence>
+          {isAccepting && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+              className="overflow-hidden border-t border-[var(--ds-hairline)] bg-[var(--ds-surface-1)]/60 p-5 md:p-6"
+            >
+              <span className="text-[10px] font-bold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading mb-4 block">
+                Executing Git Workflow
+              </span>
               <div className="flex flex-col gap-3">
-                {REVIEW_CHECKS.map((check, index) => {
-                  const isPast = index < activeCheck;
-                  const isCurrent = index === activeCheck;
+                {gitSteps.map((step, index) => {
+                  const isDone = index < gitStep;
+                  const isActive = index === gitStep;
 
                   return (
-                    <div key={check} className="flex items-center gap-3">
-                      {isPast ? (
-                        <Check className="h-4 w-4 text-emerald-500 shrink-0" />
-                      ) : isCurrent ? (
-                        <Loader2 className="h-4 w-4 text-blue-500 shrink-0 animate-spin" />
-                      ) : (
-                        <Circle className="h-4 w-4 text-[var(--ds-ink-tertiary)] shrink-0" />
-                      )}
-                      <span
-                        className={cn(
-                          "text-[13px] font-mono",
-                          isPast
-                            ? "text-[var(--ds-ink)]"
-                            : isCurrent
-                              ? "text-blue-500 font-medium"
-                              : "text-[var(--ds-ink-subtle)]",
+                    <div key={step.name} className="flex items-center justify-between text-[12px] font-mono">
+                      <div className="flex items-center gap-2.5">
+                        {isDone ? (
+                          <Check className="h-3.5 w-3.5 text-emerald-500 shrink-0" strokeWidth={2.5} />
+                        ) : isActive ? (
+                          <Loader2 className="h-3.5 w-3.5 text-amber-500 animate-spin shrink-0" />
+                        ) : (
+                          <Circle className="h-3.5 w-3.5 text-[var(--ds-ink-tertiary)] shrink-0" />
                         )}
-                      >
-                        {check}
+                        <span className={cn(
+                          isDone ? "text-[var(--ds-ink)]" : isActive ? "text-[var(--ds-ink)] font-medium" : "text-[var(--ds-ink-tertiary)]"
+                        )}>
+                          {step.name}
+                        </span>
+                      </div>
+                      <span className={cn(
+                        "text-[11px]",
+                        isDone ? "text-emerald-500 font-medium" : isActive ? "text-amber-500" : "text-[var(--ds-ink-tertiary)]"
+                      )}>
+                        {isDone ? "Completed" : isActive ? "Active" : "Pending"}
                       </span>
                     </div>
                   );
                 })}
               </div>
-            </div>
-
-            {/* LIVE ACTIVITY */}
-            <div className="flex flex-col p-5 md:p-6 flex-1 bg-[#111110]">
-              <span className="text-[10px] font-bold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading mb-4 block">
-                Review Activity
-              </span>
-              <div className="flex flex-col gap-4 font-mono text-[11px]">
-                {ACTIVITY_LOGS.slice(0, activeLog + 1).map((log, i) => (
-                  <motion.div
-                    initial={{ opacity: 0, x: -5 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    key={i}
-                    className="flex flex-col gap-1 text-[var(--ds-ink-subtle)]"
-                  >
-                    <span className="text-[var(--ds-ink-tertiary)]">
-                      19:38:{40 + i * 2}
-                    </span>
-                    <span>{log}</span>
-                  </motion.div>
-                ))}
-              </div>
-            </div>
-          </div>
-        ) : (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="flex flex-col"
-          >
-            {/* FILES REVIEWED */}
-            <div className="flex flex-col p-5 md:p-6 border-b border-[var(--ds-hairline)] bg-[var(--ds-canvas)]">
-              <span className="text-[10px] font-bold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading mb-4 block">
-                Files Reviewed
-              </span>
-              <div className="flex flex-col gap-3">
-                <div className="flex items-center justify-between text-[13px]">
-                  <span className="font-mono text-[var(--ds-ink)]">
-                    src/orders/process.ts
-                  </span>
-                  <div className="flex items-center gap-3">
-                    <span className="text-[12px] font-mono text-emerald-500">
-                      +2 / -2
-                    </span>
-                    <Check className="h-4 w-4 text-emerald-500" />
-                  </div>
-                </div>
-                <div className="flex items-center justify-between text-[13px]">
-                  <span className="font-mono text-[var(--ds-ink)]">
-                    src/workers/risk-worker.ts
-                  </span>
-                  <div className="flex items-center gap-3">
-                    <span className="text-[12px] font-mono text-emerald-500">
-                      +8 / -0
-                    </span>
-                    <Check className="h-4 w-4 text-emerald-500" />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* REVIEW RESULT */}
-            <div className="flex flex-col p-5 md:p-6 border-b border-[var(--ds-hairline)] bg-[var(--ds-canvas)]">
-              <div className="flex items-center gap-2 mb-6">
-                <Check className="h-4 w-4 text-emerald-500" />
-                <span className="text-[10px] font-bold tracking-widest text-[var(--ds-ink)] uppercase font-heading">
-                  Review Passed
-                </span>
-                <span className="text-[12px] text-[var(--ds-ink-subtle)] ml-2 border-l border-[var(--ds-hairline)] pl-4">
-                  No blocking issues found.
-                </span>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-y-4 gap-x-8 text-[12px]">
-                <div className="flex items-center justify-between py-2 border-b border-[var(--ds-hairline)]">
-                  <span className="text-[var(--ds-ink-subtle)]">
-                    Correctness
-                  </span>
-                  <div className="flex items-center gap-1.5 text-emerald-500">
-                    <Check className="h-3.5 w-3.5" />
-                    <span>No issues</span>
-                  </div>
-                </div>
-                <div className="flex items-center justify-between py-2 border-b border-[var(--ds-hairline)]">
-                  <span className="text-[var(--ds-ink-subtle)]">
-                    Regression risk
-                  </span>
-                  <div className="flex items-center gap-1.5 text-emerald-500">
-                    <Check className="h-3.5 w-3.5" />
-                    <span>Low</span>
-                  </div>
-                </div>
-                <div className="flex items-center justify-between py-2 border-b border-[var(--ds-hairline)]">
-                  <span className="text-[var(--ds-ink-subtle)]">Security</span>
-                  <div className="flex items-center gap-1.5 text-emerald-500">
-                    <Check className="h-3.5 w-3.5" />
-                    <span>No blocking findings</span>
-                  </div>
-                </div>
-                <div className="flex items-center justify-between py-2 border-b border-[var(--ds-hairline)]">
-                  <span className="text-[var(--ds-ink-subtle)]">Tests</span>
-                  <div className="flex items-center gap-1.5 font-mono text-[var(--ds-ink)]">
-                    <span>100 / 100 passing</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* INLINE DETAILS EXPANSION (CONDITIONAL) */}
-            <AnimatePresence>
-              {showDetails && (
-                <motion.div
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: "auto", opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  className="flex flex-col p-5 md:p-6 border-b border-[var(--ds-hairline)] bg-[var(--ds-surface-2)] overflow-hidden"
-                >
-                  <span className="text-[10px] font-bold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading mb-4 block">
-                    Detailed Metrics
-                  </span>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-[12px]">
-                    <div className="flex flex-col gap-1.5">
-                      <span className="text-[var(--ds-ink-tertiary)]">
-                        Reviewed
-                      </span>
-                      <div className="flex flex-col font-mono text-[var(--ds-ink)] gap-0.5">
-                        <span>2 files</span>
-                        <span className="text-emerald-500">10 additions</span>
-                        <span className="text-red-500">2 deletions</span>
-                      </div>
-                    </div>
-                    <div className="flex flex-col gap-1.5">
-                      <span className="text-[var(--ds-ink-tertiary)]">
-                        Verification
-                      </span>
-                      <span className="font-mono text-[var(--ds-ink)]">
-                        100 / 100 tests
-                      </span>
-                    </div>
-                    <div className="flex flex-col gap-1.5">
-                      <span className="text-[var(--ds-ink-tertiary)]">
-                        Risk
-                      </span>
-                      <span className="font-mono text-emerald-500">Low</span>
-                    </div>
-                    <div className="flex flex-col gap-1.5">
-                      <span className="text-[var(--ds-ink-tertiary)]">
-                        Findings
-                      </span>
-                      <div className="flex flex-col font-mono gap-0.5">
-                        <span className="text-emerald-500">0 blocking</span>
-                        <span className="text-[var(--ds-ink)]">0 warnings</span>
-                        <span className="text-blue-500">1 suggestion</span>
-                      </div>
-                    </div>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            {/* ACTION ROW */}
-            <div className="flex items-center justify-end p-4 md:p-5 bg-[var(--ds-canvas)]">
-              <Button
-                onClick={() => setShowDetails(!showDetails)}
-                variant="outline"
-                className="h-8 px-4 text-[13px] font-medium"
-              >
-                {showDetails ? "Hide full review" : "View full review →"}
-              </Button>
-            </div>
-          </motion.div>
-        )}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </motion.div>
-    </div>
+    </motion.div>
   );
 }
 
-function RepairStage({ repair, onStageSelect }: any) {
-  const [activeFile, setActiveFile] = React.useState("src/orders/process.ts");
-  const [copied, setCopied] = React.useState(false);
+/* ============================================================
+   STAGE 9: Pull Request (pull_request)
+   ============================================================ */
 
-  const diffs: any = {
-    "src/orders/process.ts": [
-      {
-        type: "context",
-        lineNum: 18,
-        text: "export async function processOrder(order) {",
-      },
-      { type: "context", lineNum: 19, text: "" },
-      {
-        type: "removed",
-        lineNum: 20,
-        text: "  const result = calculateRiskScore(order);",
-      },
-      {
-        type: "removed",
-        lineNum: 21,
-        text: "  return persistOrder({ ...order, result });",
-      },
-      {
-        type: "added",
-        lineNum: 20,
-        text: "  const result = await riskWorker.calculate(order);",
-      },
-      {
-        type: "added",
-        lineNum: 21,
-        text: "  return persistOrder({ ...order, result });",
-      },
-      { type: "context", lineNum: 22, text: "}" },
-    ],
-    "src/workers/risk-worker.ts": [
-      { type: "context", lineNum: 4, text: "export const riskWorker = {" },
-      {
-        type: "context",
-        lineNum: 5,
-        text: "  async calculate(order: Order) {",
-      },
-      {
-        type: "added",
-        lineNum: 6,
-        text: "    // Perform heavy CPU-bound risk scoring",
-      },
-      { type: "added", lineNum: 7, text: "    let score = 0;" },
-      {
-        type: "added",
-        lineNum: 8,
-        text: "    for (let i = 0; i < 1000000; i++) {",
-      },
-      { type: "added", lineNum: 9, text: "      score += Math.random();" },
-      { type: "added", lineNum: 10, text: "    }" },
-      { type: "added", lineNum: 11, text: "    return score;" },
-      { type: "context", lineNum: 12, text: "  }" },
-      { type: "context", lineNum: 13, text: "};" },
-    ],
+function RaisingPRStage({
+  data,
+  onStageSelect,
+  investigationStatus = "completed",
+}: {
+  data: any;
+  onStageSelect: (id: string) => void;
+  investigationStatus?: InvestigationStatus;
+}) {
+  const { pullRequest, repair, verification } = data;
+  const vm = verification?.metrics;
+
+  const [isEditing, setIsEditing] = useState(false);
+  const [prTitle, setPrTitle] = useState(pullRequest?.title || "Fix Node.js event-loop starvation");
+  const [prDescription, setPrDescription] = useState(
+    pullRequest?.description || "Move CPU-bound risk scoring off the Node.js main thread after deterministic runtime verification."
+  );
+
+  const handleSave = (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsEditing(false);
   };
 
-  const handleCopy = () => {
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  const currentDiff = diffs[activeFile] || diffs["src/orders/process.ts"];
-  const currentFileStats = repair.files?.find(
-    (f: any) => f.path === activeFile,
-  ) || { changes: { added: 0, removed: 0 } };
+  const repoUrl = data?.repository?.url || "https://github.com/Abhyanthk/orders-api";
+  const prNumber = pullRequest?.number || 42;
+  const prUrl = `${repoUrl}/pull/${prNumber}`;
 
   return (
-    <div className="flex flex-col animate-in fade-in slide-in-from-bottom-2 duration-500 max-w-[950px]">
-      {/* HEADER */}
-      <div className="flex flex-col gap-1.5 mb-8 md:mb-10">
-        <span className="text-[11px] font-bold tracking-[0.08em] text-emerald-500 uppercase font-heading">
-          Completed
+    <motion.div
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
+      className="flex flex-col max-w-[840px]"
+    >
+      {/* Header */}
+      <div className="flex flex-col gap-1.5 mb-8">
+        <span className="text-[10px] font-bold tracking-widest text-emerald-500 uppercase font-heading">
+          PULL REQUEST READY
         </span>
-        <h1 className="text-[28px] md:text-[32px] font-semibold text-[var(--ds-ink)] tracking-tight leading-tight font-heading">
-          Repair
+        <h1 className="text-[26px] md:text-[30px] font-semibold text-[var(--ds-ink)] tracking-tight leading-tight font-heading">
+          Pull request
         </h1>
-        <p className="text-[14px] text-[var(--ds-ink-subtle)] leading-relaxed mt-1 max-w-[680px]">
-          {repair.title ||
-            "Move the CPU-bound risk scoring off the Node.js main thread without changing the public API contract."}
+        <p className="text-[13px] text-[var(--ds-ink-subtle)] leading-relaxed max-w-[680px]">
+          The approved repair has been written to GitHub and the pull request is ready.
         </p>
       </div>
 
-      {/* REPAIR SUMMARY */}
-      <div className="flex flex-col mb-8">
-        <span className="text-[10px] font-bold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading mb-4 block">
-          Repair Summary
-        </span>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-y-4 gap-x-8 text-[12px] border-y border-[var(--ds-hairline)] py-4 bg-[var(--ds-surface-1)]">
-          <div className="flex flex-col gap-1.5">
-            <span className="text-[var(--ds-ink-subtle)]">Strategy</span>
-            <span className="font-mono text-[var(--ds-ink)]">
-              {repair.strategy || "Worker offload"}
-            </span>
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <span className="text-[var(--ds-ink-subtle)]">Files changed</span>
-            <span className="font-mono text-[var(--ds-ink)]">
-              {repair.filesChanged || 2}
-            </span>
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <span className="text-[var(--ds-ink-subtle)]">Risk surface</span>
-            <span className="font-mono text-[var(--ds-ink)]">
-              {repair.riskSurface || "Minimal"}
-            </span>
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <span className="text-[var(--ds-ink-subtle)]">API contract</span>
-            <span className="font-mono text-[var(--ds-ink)]">Unchanged</span>
-          </div>
-        </div>
-      </div>
-
-      <div className="flex flex-col border border-[var(--ds-hairline)] bg-[var(--ds-surface-1)] rounded-[8px] overflow-hidden mb-8 shadow-sm">
-        {/* FILES NAVIGATOR */}
-        <div className="flex flex-col md:flex-row divide-y md:divide-y-0 md:divide-x divide-[var(--ds-hairline)] border-b border-[var(--ds-hairline)] bg-[var(--ds-canvas)]">
-          {(
-            repair.files || [
-              { path: "src/orders/process.ts" },
-              { path: "src/workers/risk-worker.ts" },
-            ]
-          ).map((file: any) => {
-            const isSelected = activeFile === file.path;
-            return (
-              <button
-                key={file.path}
-                onClick={() => setActiveFile(file.path)}
-                className={cn(
-                  "flex items-center justify-between p-4 flex-1 text-left transition-colors duration-200 outline-none",
-                  isSelected
-                    ? "bg-[var(--ds-surface-2)]"
-                    : "hover:bg-[var(--ds-surface-1)] opacity-70 hover:opacity-100",
-                )}
-              >
-                <div className="flex items-center gap-2">
-                  <CheckCircle2
-                    className={cn(
-                      "h-3.5 w-3.5",
-                      isSelected
-                        ? "text-emerald-500"
-                        : "text-[var(--ds-ink-tertiary)]",
-                    )}
-                  />
-                  <span
-                    className={cn(
-                      "text-[13px] font-mono",
-                      isSelected
-                        ? "text-[var(--ds-ink)] font-medium"
-                        : "text-[var(--ds-ink-subtle)]",
-                    )}
-                  >
-                    {file.path}
-                  </span>
-                </div>
-              </button>
-            );
-          })}
-        </div>
-
-        {/* DIFF VIEWER */}
-        <div className="flex flex-col bg-[#111110]">
-          <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--ds-hairline)]">
-            <div className="flex items-center gap-2">
-              <span className="text-[12px] font-mono text-[var(--ds-ink-subtle)]">
-                ◇ {activeFile}
-              </span>
-              <span className="text-[10px] uppercase font-bold tracking-widest text-[var(--ds-ink-tertiary)] bg-[var(--ds-surface-1)] px-1.5 py-0.5 rounded">
-                modified
-              </span>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-2 text-[12px] font-mono">
-                <span className="text-emerald-500">
-                  +
-                  {currentFileStats.changes?.added ||
-                    (activeFile.includes("process") ? 2 : 8)}
+      {/* Pull Request Card */}
+      <div className="flex flex-col rounded-[8px] border border-[var(--ds-hairline)] bg-[var(--ds-canvas)] overflow-hidden mb-6">
+        {/* PR Main Info */}
+        <div className="flex flex-col p-5 md:p-6 border-b border-[var(--ds-hairline)]">
+          <div className="flex items-start gap-3">
+            <GitPullRequest className="h-5 w-5 text-emerald-500 shrink-0 mt-0.5" />
+            <div className="flex flex-col gap-1.5 min-w-0 flex-1">
+              <div className="flex items-baseline gap-2">
+                <span className="text-[16px] font-semibold text-[var(--ds-ink)] font-heading">
+                  {prTitle}
                 </span>
-                <span className="text-red-500">
-                  -
-                  {currentFileStats.changes?.removed ||
-                    (activeFile.includes("process") ? 2 : 0)}
+                <span className="text-[13px] text-[var(--ds-ink-tertiary)] font-mono">
+                  #{prNumber}
                 </span>
               </div>
-              <button
-                onClick={handleCopy}
-                className="text-[var(--ds-ink-tertiary)] hover:text-[var(--ds-ink)] transition-colors p-1"
-                title="Copy diff"
-              >
-                {copied ? (
-                  <Check className="h-3.5 w-3.5 text-emerald-500" />
-                ) : (
-                  <Copy className="h-3.5 w-3.5" />
-                )}
-              </button>
-            </div>
-          </div>
-
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={activeFile}
-              initial={{ opacity: 0, y: 5 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -5 }}
-              transition={{ duration: 0.15 }}
-              className="flex flex-col py-3 overflow-x-auto text-[13px] leading-relaxed font-mono"
-            >
-              {currentDiff.map((line: any, i: number) => {
-                const isAdded = line.type === "added";
-                const isRemoved = line.type === "removed";
-
-                return (
-                  <div
-                    key={i}
-                    className={cn(
-                      "flex px-4 hover:bg-[var(--ds-surface-1)] transition-colors min-w-max",
-                      isAdded &&
-                      "bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20",
-                      isRemoved &&
-                      "bg-red-500/10 text-red-400 hover:bg-red-500/20",
-                      !isAdded && !isRemoved && "text-[var(--ds-ink-subtle)]",
-                    )}
-                  >
-                    <div className="w-8 text-right shrink-0 text-[11px] text-[var(--ds-ink-tertiary)] select-none pt-[1px] mr-4">
-                      {line.lineNum}
-                    </div>
-                    <div className="w-4 shrink-0 select-none pt-[1px] opacity-70">
-                      {isAdded ? "+" : isRemoved ? "-" : " "}
-                    </div>
-                    <div className="whitespace-pre">{line.text || " "}</div>
-                  </div>
-                );
-              })}
-            </motion.div>
-          </AnimatePresence>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
-        {/* EXPLANATION */}
-        <div className="flex flex-col gap-2">
-          <span className="text-[10px] font-bold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading mb-1 block">
-            Why this changed
-          </span>
-          <p className="text-[13px] text-[var(--ds-ink)] leading-relaxed">
-            CPU-bound risk scoring was blocking the request path. The repair
-            delegates the calculation to the existing worker boundary while
-            preserving the persistence contract.
-          </p>
-        </div>
-
-        {/* REPAIR IMPACT */}
-        <div className="flex flex-col gap-2">
-          <span className="text-[10px] font-bold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading mb-1 block">
-            Repair Impact
-          </span>
-          <div className="flex flex-col gap-1.5 text-[12px] text-[var(--ds-ink-subtle)]">
-            <div className="flex items-center gap-2">
-              <Check className="h-3.5 w-3.5 text-emerald-500" /> API unchanged
-            </div>
-            <div className="flex items-center gap-2">
-              <Check className="h-3.5 w-3.5 text-emerald-500" /> Worker boundary
-              reused
-            </div>
-            <div className="flex items-center gap-2">
-              <Check className="h-3.5 w-3.5 text-emerald-500" /> Minimal patch
-            </div>
-            <div className="flex items-center gap-2">
-              <Check className="h-3.5 w-3.5 text-emerald-500" /> No unrelated
-              changes
+              <p className="text-[13px] text-[var(--ds-ink-subtle)] leading-relaxed">
+                {prDescription}
+              </p>
             </div>
           </div>
         </div>
-      </div>
 
-      {/* NEXT ACTION */}
-      <div className="flex items-center justify-end p-5 md:p-6 border-t border-[var(--ds-hairline)] mt-4">
-        <div className="flex flex-col items-end gap-3">
-          <span className="text-[12px] text-[var(--ds-ink-subtle)]">
-            The patch will be checked in the sandbox before runtime
-            verification.
-          </span>
+        {/* Technical Metadata Row */}
+        <div className="grid grid-cols-2 md:grid-cols-6 gap-4 p-5 md:p-6 border-b border-[var(--ds-hairline)] text-[12px] font-mono">
+          <div className="flex flex-col gap-1">
+            <span className="text-[10px] font-sans text-[var(--ds-ink-tertiary)] uppercase font-heading">Branch</span>
+            <span className="text-[var(--ds-ink)] truncate">{pullRequest?.branch?.name || "aegis/fix-a91f"}</span>
+          </div>
+          <div className="flex flex-col gap-1">
+            <span className="text-[10px] font-sans text-[var(--ds-ink-tertiary)] uppercase font-heading">Base</span>
+            <span className="text-[var(--ds-ink)] truncate">{pullRequest?.branch?.base || "main"}</span>
+          </div>
+          <div className="flex flex-col gap-1">
+            <span className="text-[10px] font-sans text-[var(--ds-ink-tertiary)] uppercase font-heading">Commit</span>
+            <span className="text-[var(--ds-ink)] truncate">{pullRequest?.commit?.sha || "8d3c1f2"}</span>
+          </div>
+          <div className="flex flex-col gap-1">
+            <span className="text-[10px] font-sans text-[var(--ds-ink-tertiary)] uppercase font-heading">Files</span>
+            <span className="text-[var(--ds-ink)]">{repair?.filesChanged || 2}</span>
+          </div>
+          <div className="flex flex-col gap-1">
+            <span className="text-[10px] font-sans text-[var(--ds-ink-tertiary)] uppercase font-heading">Additions</span>
+            <span className="text-emerald-500 font-semibold">+10</span>
+          </div>
+          <div className="flex flex-col gap-1">
+            <span className="text-[10px] font-sans text-[var(--ds-ink-tertiary)] uppercase font-heading">Deletions</span>
+            <span className="text-red-500 font-semibold">−2</span>
+          </div>
+        </div>
+
+        {/* Verification Status Confirmation */}
+        <div className="flex items-center justify-between p-4 md:p-5 bg-[var(--ds-surface-1)]/40 border-b border-[var(--ds-hairline)] text-[12px]">
+          <div className="flex items-center gap-4 flex-wrap">
+            <div className="flex items-center gap-1.5 text-emerald-500 font-mono">
+              <Check className="h-3.5 w-3.5 shrink-0" strokeWidth={2.5} />
+              <span>{vm?.functionalTests?.after ?? 100} / {vm?.functionalTests?.total ?? 100} tests passed</span>
+            </div>
+            <span className="text-[var(--ds-hairline-strong)]">·</span>
+            <div className="flex items-center gap-1.5 text-emerald-500 font-medium">
+              <Check className="h-3.5 w-3.5 shrink-0" strokeWidth={2.5} />
+              <span>Deterministic verification passed</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Primary Action Buttons */}
+        <div className="flex items-center justify-between p-4 md:p-5">
           <Button
-            onClick={() => onStageSelect("validation")}
-            className="h-9 px-5 text-[13px] font-medium bg-[var(--ds-primary)] text-[var(--ds-on-primary)] hover:bg-[var(--ds-primary-hover)] border-0 gap-2 shadow-sm"
+            type="button"
+            variant="outline"
+            onClick={() => setIsEditing(true)}
+            className="h-9 px-4 text-[13px] font-medium border-[var(--ds-hairline)] bg-[var(--ds-surface-1)] hover:bg-[var(--ds-surface-2)]"
           >
-            Run local validation <ArrowRight className="h-4 w-4" />
+            Edit pull request
+          </Button>
+
+          <Button
+            onClick={() => window.open(prUrl, "_blank", "noopener,noreferrer")}
+            className="h-9 px-5 text-[13px] font-medium bg-[var(--ds-primary)] text-[var(--ds-on-primary)] hover:bg-[var(--ds-primary-hover)] gap-2 border-0 shadow-sm"
+          >
+            View pull request <ExternalLink className="h-3.5 w-3.5" />
           </Button>
         </div>
       </div>
-    </div>
+
+      {/* Inline Edit Modal / Disclosure */}
+      <AnimatePresence>
+        {isEditing && (
+          <motion.div
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 4 }}
+            className="flex flex-col p-5 md:p-6 rounded-[8px] border border-[var(--ds-hairline)] bg-[var(--ds-canvas)] mb-6 shadow-sm"
+          >
+            <span className="text-[10px] font-bold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading mb-4 block">
+              Edit Pull Request Metadata
+            </span>
+            <form onSubmit={handleSave} className="flex flex-col gap-4">
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[11px] font-medium text-[var(--ds-ink-subtle)]">Title</label>
+                <input
+                  type="text"
+                  value={prTitle}
+                  onChange={(e) => setPrTitle(e.target.value)}
+                  className="h-9 px-3 rounded-[6px] border border-[var(--ds-hairline)] bg-[var(--ds-surface-1)] text-[13px] text-[var(--ds-ink)] focus:outline-none focus:border-[var(--ds-primary)]"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[11px] font-medium text-[var(--ds-ink-subtle)]">Description</label>
+                <textarea
+                  rows={3}
+                  value={prDescription}
+                  onChange={(e) => setPrDescription(e.target.value)}
+                  className="p-3 rounded-[6px] border border-[var(--ds-hairline)] bg-[var(--ds-surface-1)] text-[13px] text-[var(--ds-ink)] focus:outline-none focus:border-[var(--ds-primary)] resize-none"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => setIsEditing(false)}
+                  className="h-8 px-3 text-[12px]"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  className="h-8 px-4 text-[12px] bg-[var(--ds-primary)] text-[var(--ds-on-primary)] hover:bg-[var(--ds-primary-hover)] border-0"
+                >
+                  Save changes
+                </Button>
+              </div>
+            </form>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
   );
 }
+
+/* ============================================================
+   MAIN: StageContent
+   ============================================================ */
 
 export function StageContent({
   data,
   activeStage,
   onStageSelect,
+  investigationStatus,
+  repairAttempt,
+  maxAttempts,
+  onRetry,
+  onReject,
+  onResume,
+  onPause,
 }: StageContentProps) {
-  const {
-    discovery,
-    reproduction,
-    baseline,
-    diagnosis,
-    repair,
-    validation,
-    verification,
-    pullRequest,
-    qodoReview,
-    approval,
-  } = data;
-
-  const [prTitle, setPrTitle] = useState("Fix Node.js event-loop starvation");
-  const [prDescription, setPrDescription] = useState(
-    "Move CPU-bound risk scoring off the Node.js main thread after deterministic runtime verification.",
-  );
-
-  const renderDiscover = () => (
-    <div className="flex flex-col animate-in fade-in slide-in-from-bottom-2 duration-500 max-w-[900px]">
-      {" "}
-      {/* Header */}{" "}
-      <div className="flex flex-col gap-2 mb-8 md:mb-10">
-        {" "}
-        <span className="text-[11px] font-bold tracking-[0.08em] text-emerald-500 uppercase font-heading">
-          {" "}
-          Completed{" "}
-        </span>{" "}
-        <h1 className="text-[28px] font-heading md:text-[32px] font-semibold text-[var(--ds-ink)] tracking-tight leading-tight">
-          {" "}
-          Repository Discovery{" "}
-        </h1>{" "}
-        <p className="text-[14.5px] text-[var(--ds-ink-subtle)] leading-relaxed mt-1">
-          {" "}
-          AEGIS mapped the repository to find the runtime surface, entrypoint,
-          and suspicious execution path.{" "}
-        </p>{" "}
-      </div>{" "}
-      {/* Runtime Surface Panel */}{" "}
-      <div className="flex flex-col rounded-[8px] border border-[var(--ds-hairline)] bg-[var(--ds-canvas)] mb-5 md:mb-6 overflow-hidden">
-        {" "}
-        <div className="px-4 py-2.5 border-b border-[var(--ds-hairline)] bg-[var(--ds-surface-1)]">
-          {" "}
-          <span className="text-[12px] font-medium text-[var(--ds-ink)]">
-            Runtime surface
-          </span>{" "}
-        </div>{" "}
-        <div className="flex flex-col">
-          {" "}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--ds-hairline)]">
-            {" "}
-            <span className="text-[13px] text-[var(--ds-ink-subtle)]">
-              Runtime
-            </span>{" "}
-            <span className="text-[13px] text-[var(--ds-ink)]">
-              {discovery.runtime}
-            </span>{" "}
-          </div>{" "}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--ds-hairline)]">
-            {" "}
-            <span className="text-[13px] text-[var(--ds-ink-subtle)]">
-              Entrypoint
-            </span>{" "}
-            <span className="text-[13px] text-[var(--ds-ink)]">
-              {discovery.entrypoint}
-            </span>{" "}
-          </div>{" "}
-          <div className="flex items-center justify-between px-4 py-3">
-            {" "}
-            <span className="text-[13px] text-[var(--ds-ink-subtle)]">
-              Endpoint
-            </span>{" "}
-            <span className="text-[13px] text-[var(--ds-ink)]">
-              {discovery.endpoint}
-            </span>{" "}
-          </div>{" "}
-        </div>{" "}
-      </div>{" "}
-      {/* Suspicious Path Panel */}{" "}
-      <div className="flex flex-col rounded-[8px] border border-red-500/20 bg-red-500/[0.02] mb-6 md:mb-8 p-4">
-        {" "}
-        <div className="flex items-center gap-2 mb-3">
-          {" "}
-          <div className="h-1.5 w-1.5 rounded-full bg-red-500 shrink-0" />{" "}
-          <span className="text-[11px] font-bold tracking-[0.08em] text-red-500 uppercase font-heading">
-            {" "}
-            Suspicious Path{" "}
-          </span>{" "}
-        </div>{" "}
-        <div className="flex flex-col pl-3.5">
-          {" "}
-          <span className="text-[14px] text-[var(--ds-ink)] font-medium mb-1.5">
-            {" "}
-            {discovery.suspiciousPaths[0].file}{" "}
-          </span>{" "}
-          <p className="text-[14px] text-[var(--ds-ink-subtle)] leading-relaxed">
-            {" "}
-            {discovery.suspiciousPaths[0].reason}{" "}
-          </p>{" "}
-        </div>{" "}
-      </div>{" "}
-      {/* Evidence */}{" "}
-      <div className="flex flex-col mb-7 md:mb-9">
-        {" "}
-        <span className="text-[11px] font-semibold tracking-[0.06em] text-[var(--ds-ink-tertiary)] uppercase mb-3">
-          {" "}
-          Evidence{" "}
-        </span>{" "}
-        <span className="text-[13px] text-[var(--ds-ink)] mb-2 font-medium">
-          {" "}
-          3 signals identified{" "}
-        </span>{" "}
-        <ul className="flex flex-col gap-2 text-[13px] text-[var(--ds-ink-subtle)]">
-          {" "}
-          <li className="flex items-center gap-2">
-            {" "}
-            <Check className="h-3.5 w-3.5 text-emerald-500 shrink-0" />{" "}
-            <span>Node.js runtime detected</span>{" "}
-          </li>{" "}
-          <li className="flex items-center gap-2">
-            {" "}
-            <Check className="h-3.5 w-3.5 text-emerald-500 shrink-0" />{" "}
-            <span>Endpoint identified as testable surface</span>{" "}
-          </li>{" "}
-          <li className="flex items-center gap-2">
-            {" "}
-            <Check className="h-3.5 w-3.5 text-emerald-500 shrink-0" />{" "}
-            <span>
-              Synchronous CPU-bound operation ranked as suspicious
-            </span>{" "}
-          </li>{" "}
-        </ul>{" "}
-      </div>{" "}
-      {/* Primary Action */}{" "}
-      <div className="pt-2">
-        {" "}
-        <Button
-          onClick={() => onStageSelect("reproduce")}
-          className="h-8 px-4 text-[13px] font-medium bg-[var(--ds-primary)] text-[var(--ds-on-primary)] hover:bg-[var(--ds-primary-hover)] gap-1.5 border-0"
-        >
-          {" "}
-          Continue to reproduction <ArrowRight className="h-3.5 w-3.5" />{" "}
-        </Button>{" "}
-      </div>{" "}
-    </div>
-  );
-  const renderReproduce = () => (
-    <div className="flex flex-col animate-in fade-in slide-in-from-bottom-2 duration-500 max-w-[900px]">
-      {" "}
-      {/* Top Status */}{" "}
-      <div className="flex items-center gap-3 mb-6">
-        {" "}
-        <div className="flex items-center gap-2 px-2.5 py-1 rounded-full border border-[var(--ds-hairline)] bg-[var(--ds-surface-1)]">
-          {" "}
-          <div className="h-1.5 w-1.5 rounded-full bg-amber-500 shrink-0 animate-pulse duration-1000" />{" "}
-          <span className="text-[10px] font-bold tracking-[0.06em] text-[var(--ds-ink-subtle)] uppercase">
-            {" "}
-            Active Run{" "}
-          </span>{" "}
-        </div>{" "}
-        <span className="text-[10px] font-medium tracking-[0.06em] text-[var(--ds-ink-tertiary)] uppercase">
-          {" "}
-          Mocked Execution{" "}
-        </span>{" "}
-      </div>{" "}
-      {/* Header */}{" "}
-      <div className="flex flex-col mb-8 md:mb-9">
-        {" "}
-        <span className="text-[11px] font-bold tracking-[0.08em] text-[var(--ds-ink-tertiary)] uppercase font-heading mb-2">
-          {" "}
-          Isolated Reproduction{" "}
-        </span>{" "}
-        <h1 className="text-[28px] font-heading md:text-[34px] font-semibold text-[var(--ds-ink)] tracking-tight leading-tight mb-2.5">
-          {" "}
-          Reproducing the failure{" "}
-        </h1>{" "}
-        <p className="text-[14.5px] text-[var(--ds-ink-subtle)] leading-relaxed">
-          {" "}
-          A clean Daytona sandbox is running the production-shaped workload
-          against the same endpoint.{" "}
-        </p>{" "}
-      </div>{" "}
-      {/* Main Execution Panel */}{" "}
-      <div className="flex flex-col rounded-[8px] border border-[var(--ds-hairline)] bg-[var(--ds-canvas)] mb-5 md:mb-6 overflow-hidden">
-        {" "}
-        <div className="flex items-center justify-between px-4 py-2.5 border-b border-[var(--ds-hairline)] bg-[var(--ds-surface-1)]">
-          {" "}
-          <div className="flex items-center gap-2">
-            {" "}
-            <Activity className="h-3.5 w-3.5 text-[var(--ds-ink-subtle)]" />{" "}
-            <span className="text-[12px] font-medium text-[var(--ds-ink)]">
-              daytona-7f2a
-            </span>{" "}
-          </div>{" "}
-          <span className="text-[10px] font-bold tracking-[0.08em] text-amber-500 uppercase font-heading">
-            {" "}
-            Running{" "}
-          </span>{" "}
-        </div>{" "}
-        {/* 4 Column execution metadata */}{" "}
-        <div className="grid grid-cols-2 md:grid-cols-4 divide-y md:divide-y-0 md:divide-x divide-[var(--ds-hairline)]">
-          {" "}
-          <div className="flex flex-col p-4">
-            {" "}
-            <span className="text-[10px] font-semibold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading mb-2">
-              Runtime
-            </span>{" "}
-            <span className="text-[14px] text-[var(--ds-ink)]">
-              node 20.11
-            </span>{" "}
-          </div>{" "}
-          <div className="flex flex-col p-4">
-            {" "}
-            <span className="text-[10px] font-semibold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading mb-2">
-              Workload
-            </span>{" "}
-            <span className="text-[14px] text-[var(--ds-ink)]">
-              100 req/s
-            </span>{" "}
-          </div>{" "}
-          <div className="flex flex-col p-4">
-            {" "}
-            <span className="text-[10px] font-semibold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading mb-2">
-              Health Probe
-            </span>{" "}
-            <span className="text-[14px] text-red-500">16%</span>{" "}
-          </div>{" "}
-          <div className="flex flex-col p-4">
-            {" "}
-            <span className="text-[10px] font-semibold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading mb-2">
-              Telemetry
-            </span>{" "}
-            <span className="text-[14px] text-[var(--ds-ink)]">
-              streaming
-            </span>{" "}
-          </div>{" "}
-        </div>{" "}
-      </div>{" "}
-      {/* Reproduction Result */}{" "}
-      <div className="flex flex-col rounded-[8px] border border-red-500/20 bg-red-500/[0.02] mb-3 md:mb-4 p-4">
-        {" "}
-        <div className="flex items-center gap-2 mb-2">
-          {" "}
-          <div className="h-1.5 w-1.5 rounded-full bg-red-500 shrink-0" />{" "}
-          <span className="text-[11px] font-bold tracking-[0.08em] text-red-500 uppercase font-heading">
-            {" "}
-            Reproduction Confirmed{" "}
-          </span>{" "}
-        </div>{" "}
-        <div className="flex flex-col pl-3.5">
-          {" "}
-          <p className="text-[14px] text-[var(--ds-ink)] leading-relaxed font-medium">
-            {" "}
-            Event-loop starvation under concurrent traffic{" "}
-          </p>{" "}
-        </div>{" "}
-      </div>{" "}
-      {/* Supporting Evidence */}{" "}
-      <div className="flex flex-col gap-1 text-[13px] text-[var(--ds-ink-subtle)] mb-7 md:mb-8 pl-1">
-        {" "}
-        <div className="flex items-center gap-2">
-          {" "}
-          <span className="">100 req/s</span> <span>workload</span>{" "}
-        </div>{" "}
-        <div className="flex items-center gap-2">
-          {" "}
-          <span>Health availability dropped to</span>{" "}
-          <span className="text-red-500">16%</span>{" "}
-        </div>{" "}
-      </div>{" "}
-      {/* Action Area */}{" "}
-      <div className="pt-2">
-        {" "}
-        <Button
-          onClick={() => onStageSelect("measure")}
-          className="h-8 px-4 text-[13px] font-medium bg-[var(--ds-primary)] text-[var(--ds-on-primary)] hover:bg-[var(--ds-primary-hover)] border-0 gap-1.5"
-        >
-          {" "}
-          View baseline metrics <ArrowRight className="h-3.5 w-3.5" />{" "}
-        </Button>{" "}
-      </div>{" "}
-    </div>
-  );
-  const renderMeasure = () => (
-    <div className="flex flex-col animate-in fade-in slide-in-from-bottom-2 duration-500 max-w-[900px]">
-      {/* Header */}
-      <div className="flex flex-col gap-1.5 mb-6 md:mb-7">
-        <span className="text-[11px] font-bold tracking-[0.08em] text-emerald-500 uppercase font-heading">
-          Completed
-        </span>
-        <h1 className="text-[28px] md:text-[32px] font-semibold text-[var(--ds-ink)] tracking-tight leading-tight font-heading">
-          Baseline Measurement
-        </h1>
-        <p className="text-[14px] text-[var(--ds-ink-subtle)] leading-relaxed mt-1 max-w-[680px]">
-          The endpoint completes functionally, but CPU-bound work monopolizes
-          the Node.js main thread and causes severe event-loop starvation.
-        </p>
+  // Handle global investigation states
+  if (investigationStatus === "paused" || investigationStatus === "pausing") {
+    return (
+      <div className="p-8 lg:p-12 max-w-5xl mx-auto min-h-full flex items-center justify-center">
+        <AnimatePresence mode="wait">
+          <PausedOverlay onResume={onResume} />
+        </AnimatePresence>
       </div>
+    );
+  }
 
-      {/* Primary Metrics Grid */}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 mb-6 md:mb-7">
-        <div className="flex flex-col p-4 rounded-[8px] border border-[var(--ds-hairline)] bg-[var(--ds-surface-1)] justify-center h-[100px]">
-          <span className="text-[10px] font-semibold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading mb-1.5">
-            Event P99
-          </span>
-          <span className="text-[20px] font-mono text-red-500">4,217 ms</span>
-          <span className="text-[11px] text-[var(--ds-ink-tertiary)] mt-1 font-mono">
-            &lt; 52 ms
-          </span>
-        </div>
-        <div className="flex flex-col p-4 rounded-[8px] border border-[var(--ds-hairline)] bg-[var(--ds-surface-1)] justify-center h-[100px]">
-          <span className="text-[10px] font-semibold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading mb-1.5">
-            Availability
-          </span>
-          <span className="text-[20px] font-mono text-red-500">16%</span>
-          <span className="text-[11px] text-[var(--ds-ink-tertiary)] mt-1 font-mono">
-            target 100%
-          </span>
-        </div>
-        <div className="flex flex-col p-4 rounded-[8px] border border-[var(--ds-hairline)] bg-[var(--ds-surface-1)] justify-center h-[100px]">
-          <span className="text-[10px] font-semibold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading mb-1.5">
-            Endpoint
-          </span>
-          <span className="text-[20px] font-mono text-red-500">5,102 ms</span>
-          <span className="text-[11px] text-[var(--ds-ink-tertiary)] mt-1 font-mono">
-            &lt; 100 ms
-          </span>
-        </div>
-        <div className="flex flex-col p-4 rounded-[8px] border border-[var(--ds-hairline)] bg-[var(--ds-surface-1)] justify-center h-[100px]">
-          <span className="text-[10px] font-semibold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading mb-1.5">
-            Tests
-          </span>
-          <span className="text-[20px] font-mono text-[var(--ds-ink)]">
-            100 / 100
-          </span>
-          <span className="text-[11px] text-[var(--ds-ink-tertiary)] mt-1 font-mono">
-            preserved
-          </span>
-        </div>
+  if (investigationStatus === "cancelled" || investigationStatus === "cancelling") {
+    return (
+      <div className="p-8 lg:p-12 max-w-5xl mx-auto min-h-full flex items-center justify-center">
+        <AnimatePresence mode="wait">
+          <CancelledOverlay />
+        </AnimatePresence>
       </div>
+    );
+  }
 
-      {/* Animated Baseline Chart (Logarithmic-style visual scaling) */}
-      <div className="flex flex-col rounded-[8px] border border-[var(--ds-hairline)] bg-[var(--ds-canvas)] overflow-hidden mb-6 md:mb-7">
-        <div className="flex flex-col px-4 py-3 border-b border-[var(--ds-hairline)] bg-[var(--ds-surface-1)]/30">
-          <h3 className="text-[12px] font-medium text-[var(--ds-ink)] mb-0.5">
-            Event-loop latency
-          </h3>
-          <p className="text-[11px] text-[var(--ds-ink-subtle)]">
-            Latency under concurrent workload
-          </p>
-        </div>
-        <div className="relative p-4 md:p-5 h-[180px] flex items-end overflow-hidden">
-          {/* Subtle Grid */}
-          <div className="absolute inset-0 z-0 flex flex-col justify-between px-4 py-6 md:px-5 opacity-[0.15] pointer-events-none">
-            <div className="w-full border-t border-[var(--ds-hairline)]" />
-            <div className="w-full border-t border-[var(--ds-hairline)]" />
-            <div className="w-full border-t border-[var(--ds-hairline)]" />
-          </div>
-
-          {/* Target Line (log-scaled roughly at ~76% from top) */}
-          <div
-            className="absolute left-0 right-0 z-10 flex items-center gap-2"
-            style={{ top: "76%" }}
-          >
-            <div className="w-full border-t border-dashed border-[var(--ds-ink-tertiary)] opacity-40" />
-            <span className="absolute left-4 md:left-5 -top-4 text-[10px] font-mono text-[var(--ds-ink-tertiary)] uppercase font-heading tracking-widest">
-              target &lt; 52 ms
-            </span>
-          </div>
-
-          {/* SVG Chart */}
-          <div className="absolute inset-0 z-20 px-4 py-6 md:px-5">
-            <svg
-              viewBox="0 0 100 100"
-              preserveAspectRatio="none"
-              className="w-full h-full overflow-visible"
-            >
-              {/* Logarithmic scaled points:
-                  10 req: 18ms -> Y=92
-                  25 req: 24ms -> Y=87
-                  50 req: 41ms -> Y=80
-                  75 req: 310ms -> Y=50
-                  100 req: 4217ms -> Y=13
-              */}
-              <path
-                d="M 0 92 L 25 87 L 50 80 L 75 50 L 97 13"
-                fill="none"
-                stroke="var(--ds-ink)"
-                strokeWidth="1.5"
-                vectorEffect="non-scaling-stroke"
-                className="animate-[draw-path_0.8s_ease-out_forwards]"
-                strokeDasharray="1000"
-                strokeDashoffset="1000"
-              />
-              {/* Final point marker */}
-              <circle
-                cx="97"
-                cy="13"
-                r="3"
-                fill="var(--ds-canvas)"
-                stroke="var(--ds-ink)"
-                strokeWidth="1.5"
-                className="animate-[fade-in_0.4s_ease-out_0.7s_both]"
-              />
-            </svg>
-            <div className="absolute right-2 md:right-3 top-5 animate-[fade-in_0.4s_ease-out_0.7s_both]">
-              <span className="text-[11px] font-mono text-[var(--ds-ink)] bg-[var(--ds-canvas)]">
-                4,217 ms
-              </span>
-            </div>
-          </div>
-
-          {/* Axis Labels */}
-          <div className="absolute bottom-1.5 left-4 md:left-5 right-4 md:right-5 flex justify-between text-[10px] font-mono text-[var(--ds-ink-tertiary)] z-30">
-            <span>10</span>
-            <span>25</span>
-            <span>50</span>
-            <span>75</span>
-            <span>100 req/s</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Compact Evidence Row */}
-      <div className="flex flex-col gap-3 mb-8 md:mb-10 px-1 mt-2">
-        <div className="flex items-center gap-6">
-          <span className="text-[13px] text-[var(--ds-ink-subtle)] w-[140px]">
-            Health availability
-          </span>
-          <div className="flex items-center gap-2 text-[13px] font-mono">
-            <span className="text-[var(--ds-ink)]">100% target</span>
-            <span className="text-[var(--ds-ink-tertiary)]">→</span>
-            <span className="text-red-500">16% observed</span>
-          </div>
-        </div>
-        <div className="flex items-center gap-6">
-          <span className="text-[13px] text-[var(--ds-ink-subtle)] w-[140px]">
-            Functional tests
-          </span>
-          <div className="flex items-center gap-2 text-[13px] font-mono text-[var(--ds-ink)]">
-            <Check className="h-3.5 w-3.5 text-emerald-500" />
-            <span>100 / 100 passed</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Baseline Conclusion (Inline Notice) */}
-      <div className="flex items-start gap-3 mb-6 md:mb-7">
-        <Info className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
-        <div className="flex flex-col">
-          <span className="text-[13px] font-medium text-[var(--ds-ink)] mb-0.5">
-            Baseline captured
-          </span>
-          <p className="text-[13px] text-[var(--ds-ink-subtle)] leading-relaxed">
-            Endpoint remains functionally correct, but CPU-bound work causes
-            severe event-loop starvation under concurrent traffic.
-          </p>
-        </div>
-      </div>
-
-      {/* Action */}
-      <div className="pt-0">
-        <Button
-          onClick={() => onStageSelect("diagnose")}
-          className="h-8 px-4 text-[13px] font-medium bg-[var(--ds-primary)] text-[var(--ds-on-primary)] hover:bg-[var(--ds-primary-hover)] border-0 gap-1.5"
-        >
-          Review diagnosis <ArrowRight className="h-3.5 w-3.5" />
-        </Button>
-      </div>
-    </div>
-  );
-
-  const renderDiagnose = () => (
-    <div className="flex flex-col animate-in fade-in slide-in-from-bottom-2 duration-500 max-w-[900px]">
-      {/* Header */}
-      <div className="flex flex-col gap-1.5 mb-8 md:mb-10">
-        <span className="text-[11px] font-bold tracking-[0.08em] text-emerald-500 uppercase font-heading">
-          Completed
-        </span>
-        <h1 className="text-[28px] md:text-[32px] font-semibold text-[var(--ds-ink)] tracking-tight leading-tight font-heading">
-          Diagnosis
-        </h1>
-        <p className="text-[14px] text-[var(--ds-ink-subtle)] leading-relaxed mt-1 max-w-[700px]">
-          Risk scoring executes synchronously inside the request handler,
-          blocking the Node.js event loop.
-        </p>
-      </div>
-
-      {/* Root Cause Block */}
-      <div className="flex flex-col mb-8 md:mb-10 animate-in fade-in duration-700">
-        <h3 className="text-[11px] font-bold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading mb-4">
-          Root Cause
-        </h3>
-        <div className="flex flex-col rounded-[8px] border border-[var(--ds-hairline)] bg-[var(--ds-surface-1)]">
-          <div className="p-4 md:p-5 border-b border-[var(--ds-hairline)]">
-            <span className="text-[16px] font-medium text-[var(--ds-ink)] font-heading">
-              Event-loop starvation
-            </span>
-            <p className="text-[13px] text-[var(--ds-ink-subtle)] mt-1.5">
-              Caused by synchronous CPU-bound risk scoring inside POST
-              /orders/process.
-            </p>
-          </div>
-          <div className="flex flex-col sm:flex-row sm:items-center sm:divide-x divide-y sm:divide-y-0 divide-[var(--ds-hairline)] bg-[var(--ds-canvas)]">
-            <div className="flex flex-col p-4 flex-1">
-              <span className="text-[10px] font-semibold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading mb-1">
-                Affected endpoint
-              </span>
-              <span className="text-[12px] font-mono text-[var(--ds-ink)]">
-                POST /orders/process
-              </span>
-            </div>
-            <div className="flex flex-col p-4 flex-1">
-              <span className="text-[10px] font-semibold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading mb-1">
-                Runtime
-              </span>
-              <span className="text-[12px] font-mono text-[var(--ds-ink)]">
-                Node.js 20.11
-              </span>
-            </div>
-            <div className="flex flex-col p-4 flex-1">
-              <span className="text-[10px] font-semibold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading mb-1">
-                Confidence
-              </span>
-              <span className="text-[12px] font-mono text-[var(--ds-ink)]">
-                97%
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Causal Flow (Vertical) */}
-      <div className="flex flex-col mb-8 md:mb-10">
-        <h3 className="text-[11px] font-bold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading mb-4">
-          Why it happens
-        </h3>
-        <div className="flex flex-col ml-2 overflow-hidden">
-          <div className="flex items-start gap-5 group animate-[fade-in_0.4s_ease-out_0.2s_both]">
-            <div className="flex flex-col items-center mt-1">
-              <div className="h-2 w-2 rounded-full border-2 border-[var(--ds-ink-tertiary)] bg-[var(--ds-canvas)] group-hover:border-[var(--ds-ink)] transition-colors" />
-              <div className="h-10 w-px bg-[var(--ds-hairline-strong)]" />
-            </div>
-            <div className="flex flex-col pb-6 -mt-0.5">
-              <span className="text-[13px] font-medium text-[var(--ds-ink)]">
-                Incoming request
-              </span>
-              <span className="text-[12px] text-[var(--ds-ink-subtle)] mt-0.5 font-mono">
-                POST /orders/process
-              </span>
-            </div>
-          </div>
-
-          <div className="flex items-start gap-5 group animate-[fade-in_0.4s_ease-out_0.4s_both]">
-            <div className="flex flex-col items-center mt-1">
-              <div className="h-2 w-2 rounded-full border-2 border-[var(--ds-ink-tertiary)] bg-[var(--ds-canvas)] group-hover:border-[var(--ds-ink)] transition-colors" />
-              <div className="h-10 w-px bg-[var(--ds-hairline-strong)]" />
-            </div>
-            <div className="flex flex-col pb-6 -mt-0.5">
-              <span className="text-[13px] font-medium text-[var(--ds-ink)]">
-                Risk scoring executes
-              </span>
-              <span className="text-[12px] text-[var(--ds-ink-subtle)] mt-0.5 font-mono">
-                src/orders/process.ts
-              </span>
-            </div>
-          </div>
-
-          <div className="flex items-start gap-5 group animate-[fade-in_0.4s_ease-out_0.6s_both]">
-            <div className="flex flex-col items-center mt-1">
-              <div className="h-2 w-2 rounded-full border-2 border-amber-500 bg-[var(--ds-canvas)]" />
-              <div className="h-10 w-px bg-[var(--ds-hairline-strong)]" />
-            </div>
-            <div className="flex flex-col pb-6 -mt-0.5">
-              <span className="text-[13px] font-medium text-[var(--ds-ink)]">
-                CPU monopolizes main thread
-              </span>
-              <span className="text-[12px] text-[var(--ds-ink-subtle)] mt-0.5 font-mono">
-                Synchronous execution
-              </span>
-            </div>
-          </div>
-
-          <div className="flex items-start gap-5 group animate-[fade-in_0.4s_ease-out_0.8s_both]">
-            <div className="flex flex-col items-center mt-1">
-              <div className="h-2 w-2 rounded-full border-2 border-red-500 bg-[var(--ds-canvas)]" />
-              <div className="h-10 w-px bg-[var(--ds-hairline-strong)]" />
-            </div>
-            <div className="flex flex-col pb-6 -mt-0.5">
-              <span className="text-[13px] font-medium text-red-500">
-                Event loop blocked
-              </span>
-              <span className="text-[12px] text-[var(--ds-ink-subtle)] mt-0.5 font-mono">
-                Event-loop P99: 4,217 ms
-              </span>
-            </div>
-          </div>
-
-          <div className="flex items-start gap-5 group animate-[fade-in_0.4s_ease-out_1.0s_both]">
-            <div className="flex flex-col items-center mt-1">
-              <div className="h-2 w-2 rounded-full border-2 border-red-500 bg-[var(--ds-canvas)]" />
-              <div className="h-10 w-px bg-[var(--ds-hairline-strong)]" />
-            </div>
-            <div className="flex flex-col pb-6 -mt-0.5">
-              <span className="text-[13px] font-medium text-red-500">
-                Health checks timeout
-              </span>
-              <span className="text-[12px] text-[var(--ds-ink-subtle)] mt-0.5 font-mono">
-                /healthz
-              </span>
-            </div>
-          </div>
-
-          <div className="flex items-start gap-5 group animate-[fade-in_0.4s_ease-out_1.2s_both]">
-            <div className="flex flex-col items-center mt-1">
-              <div className="h-2 w-2 rounded-full border-2 border-red-500 bg-[var(--ds-canvas)]" />
-            </div>
-            <div className="flex flex-col -mt-0.5">
-              <span className="text-[13px] font-medium text-red-500">
-                Availability drops to 16%
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Evidence */}
-      <div className="flex flex-col mb-8 md:mb-10 animate-[fade-in_0.6s_ease-out_0.6s_both]">
-        <h3 className="text-[11px] font-bold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading mb-4">
-          Supporting evidence
-        </h3>
-        <div className="flex flex-col gap-4">
-          <div className="flex flex-col border-b border-[var(--ds-hairline)] pb-4">
-            <div className="flex items-center gap-2 mb-1">
-              <Check className="h-3.5 w-3.5 text-[var(--ds-ink-tertiary)] shrink-0" />
-              <span className="text-[13px] font-medium text-[var(--ds-ink)]">
-                CPU profile shows synchronous execution
-              </span>
-            </div>
-            <div className="flex items-center justify-between pl-[22px]">
-              <span className="text-[12px] text-[var(--ds-ink-subtle)]">
-                Main thread consumed by risk scoring
-              </span>
-              <span className="text-[10px] font-mono text-[var(--ds-ink-tertiary)]">
-                PROFILE
-              </span>
-            </div>
-          </div>
-
-          <div className="flex flex-col border-b border-[var(--ds-hairline)] pb-4">
-            <div className="flex items-center gap-2 mb-1">
-              <Check className="h-3.5 w-3.5 text-[var(--ds-ink-tertiary)] shrink-0" />
-              <span className="text-[13px] font-medium text-[var(--ds-ink)]">
-                Event-loop latency reached 4217 ms
-              </span>
-            </div>
-            <div className="flex items-center justify-between pl-[22px]">
-              <span className="text-[12px] text-[var(--ds-ink-subtle)]">
-                Exceeded target by 81x
-              </span>
-              <span className="text-[10px] font-mono text-[var(--ds-ink-tertiary)]">
-                RUNTIME
-              </span>
-            </div>
-          </div>
-
-          <div className="flex flex-col">
-            <div className="flex items-center gap-2 mb-1">
-              <Check className="h-3.5 w-3.5 text-[var(--ds-ink-tertiary)] shrink-0" />
-              <span className="text-[13px] font-medium text-[var(--ds-ink)]">
-                Health availability dropped to 16%
-              </span>
-            </div>
-            <div className="flex items-center justify-between pl-[22px]">
-              <span className="text-[12px] text-[var(--ds-ink-subtle)]">
-                Health probes missed during workload
-              </span>
-              <span className="text-[10px] font-mono text-[var(--ds-ink-tertiary)]">
-                AVAILABILITY
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Timeline Correlation */}
-      <div className="flex flex-col mb-8 md:mb-10 animate-[fade-in_0.6s_ease-out_1s_both]">
-        <h3 className="text-[11px] font-bold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading mb-4">
-          Failure correlation
-        </h3>
-        <div className="flex flex-col text-[12px] font-mono">
-          <div className="flex items-center gap-4 py-1.5">
-            <span className="text-[var(--ds-ink-subtle)] w-[72px] shrink-0">
-              19:33:18
-            </span>
-            <span className="text-[var(--ds-ink)]">workload started</span>
-          </div>
-          <div className="h-3.5 w-px bg-[var(--ds-hairline)] ml-[36px]" />
-          <div className="flex items-center gap-4 py-1.5">
-            <span className="text-[var(--ds-ink-subtle)] w-[72px] shrink-0">
-              19:33:22
-            </span>
-            <span className="text-[var(--ds-ink)]">health degraded</span>
-          </div>
-          <div className="h-3.5 w-px bg-[var(--ds-hairline)] ml-[36px]" />
-          <div className="flex items-center gap-4 py-1.5">
-            <span className="text-[var(--ds-ink-subtle)] w-[72px] shrink-0">
-              19:34:28
-            </span>
-            <span className="text-[var(--ds-ink)]">latency spike detected</span>
-          </div>
-          <div className="h-3.5 w-px bg-[var(--ds-hairline)] ml-[36px]" />
-          <div className="flex items-center gap-4 py-1.5">
-            <span className="text-[var(--ds-ink-subtle)] w-[72px] shrink-0">
-              19:35:17
-            </span>
-            <span className="text-[var(--ds-ink)] font-medium text-[var(--ds-primary)]">
-              root cause isolated
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* Confidence */}
-      <div className="flex flex-col mb-8 md:mb-10 p-4 rounded-[8px] border border-[var(--ds-hairline)] bg-[var(--ds-surface-1)] animate-[fade-in_0.6s_ease-out_1.4s_both]">
-        <div className="flex items-end justify-between mb-3">
-          <span className="text-[12px] font-medium text-[var(--ds-ink)]">
-            Diagnosis confidence
-          </span>
-          <span className="text-[14px] font-mono font-medium text-emerald-500">
-            97%
-          </span>
-        </div>
-        <div className="h-1 w-full bg-[var(--ds-canvas)] rounded-full overflow-hidden mb-4">
-          <div
-            className="h-full bg-emerald-500 rounded-full animate-[draw-path_0.8s_ease-out_1.5s_both]"
-            style={{ width: "97%" }}
-          />
-        </div>
-        <div className="flex flex-col gap-1.5">
-          <span className="text-[10px] font-semibold tracking-widest text-[var(--ds-ink-tertiary)] uppercase font-heading">
-            Based on
-          </span>
-          <span className="text-[12px] text-[var(--ds-ink-subtle)]">
-            CPU profile, Latency measurements, Health telemetry, Workload
-            reproduction
-          </span>
-        </div>
-      </div>
-
-      {/* Action */}
-      <div className="pt-0">
-        <Button
-          onClick={() => onStageSelect("repair")}
-          className="h-8 px-4 text-[13px] font-medium bg-[var(--ds-primary)] text-[var(--ds-on-primary)] hover:bg-[var(--ds-primary-hover)] border-0 gap-1.5"
-        >
-          Prepare minimal repair <ArrowRight className="h-3.5 w-3.5" />
-        </Button>
-      </div>
-    </div>
-  );
-  const renderRepair = () => (
-    <RepairStage repair={repair} onStageSelect={onStageSelect} />
-  );
-  const renderValidation = () => (
-    <LocalValidationStage
-      validation={validation}
-      repair={repair}
-      onStageSelect={onStageSelect}
-    />
-  );
-  const renderVerify = () => (
-    <VerificationStage
-      verification={verification}
-      onStageSelect={onStageSelect}
-    />
-  );
-  const renderApproval = () => (
-    <ApprovalStage
-      approval={approval}
-      verification={verification}
-      repair={repair}
-      onStageSelect={onStageSelect}
-      prTitle={prTitle}
-      setPrTitle={setPrTitle}
-      prDescription={prDescription}
-      setPrDescription={setPrDescription}
-    />
-  );
-  const renderPullRequest = () => (
-    <PullRequestStage
-      pullRequest={pullRequest}
-      onStageSelect={onStageSelect}
-      prTitle={prTitle}
-      setPrTitle={setPrTitle}
-      prDescription={prDescription}
-      setPrDescription={setPrDescription}
-    />
-  );
-  const renderQodoReview = () => <QodoReviewStage prTitle={prTitle} />;
   return (
     <div className="p-8 lg:p-12 max-w-5xl mx-auto min-h-full">
-      {" "}
-      {activeStage === "discover" && renderDiscover()}{" "}
-      {activeStage === "reproduce" && renderReproduce()}{" "}
-      {activeStage === "measure" && renderMeasure()}{" "}
-      {activeStage === "diagnose" && renderDiagnose()}{" "}
-      {activeStage === "repair" && renderRepair()}{" "}
-      {activeStage === "validation" && renderValidation()}{" "}
-      {activeStage === "verify" && renderVerify()}{" "}
-      {activeStage === "approval" && renderApproval()}{" "}
-      {activeStage === "pull_request" && renderPullRequest()}{" "}
-      {activeStage === "qodo_review" && renderQodoReview()}{" "}
-    </div>
-  );
-}
-function MetricCard({
-  label,
-  value,
-  target,
-  isBad = false,
-}: {
-  label: string;
-  value: string;
-  target: string;
-  isBad?: boolean;
-}) {
-  return (
-    <div className="flex flex-col p-4 rounded-[var(--ds-rounded-md)] border border-[var(--ds-hairline)] bg-[var(--ds-canvas)]">
-      {" "}
-      <span className="text-[12px] text-[var(--ds-ink-subtle)] font-medium mb-2">
-        {label}
-      </span>{" "}
-      <span
-        className={cn(
-          "text-[20px] font-medium tracking-tight",
-          isBad ? "text-red-500" : "text-[var(--ds-ink)]",
-        )}
-      >
-        {" "}
-        {value}{" "}
-      </span>{" "}
-      <span className="text-[11px] text-[var(--ds-ink-tertiary)] mt-1 tracking-wider uppercase font-heading">
-        {" "}
-        Target: {target}{" "}
-      </span>{" "}
-    </div>
-  );
-}
-function VerificationCard({
-  label,
-  metric,
-  inverted = false,
-}: {
-  label: string;
-  metric: any;
-  inverted?: boolean;
-}) {
-  /* If inverted, a lower number is better */ return (
-    <div className="flex flex-col p-4 rounded-[var(--ds-rounded-md)] border border-[var(--ds-hairline)] bg-[var(--ds-canvas)]">
-      {" "}
-      <span className="text-[12px] text-[var(--ds-ink-subtle)] font-medium mb-3">
-        {label}
-      </span>{" "}
-      <div className="flex items-center gap-3">
-        {" "}
-        <span className="text-[18px] text-[var(--ds-ink-tertiary)] line-through">
-          {metric.before}
-          {metric.unit}
-        </span>{" "}
-        <ArrowRight className="h-4 w-4 text-[var(--ds-ink-subtle)]" />{" "}
-        <span className="text-[20px] font-heading font-medium text-emerald-500">
-          {metric.after}
-          {metric.unit}
-        </span>{" "}
-      </div>{" "}
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={activeStage}
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -8 }}
+          transition={{ duration: 0.25, ease: [0.25, 0.1, 0.25, 1] }}
+        >
+          {(activeStage === "repo_context" || activeStage === "discover") && (
+            <RepoInfoStage data={data} onStageSelect={onStageSelect} />
+          )}
+          {activeStage === "repo_analyzer" && (
+            <RepoAnalyzerStage
+              data={data}
+              onStageSelect={onStageSelect}
+              investigationStatus={investigationStatus}
+            />
+          )}
+          {(activeStage === "endpoint_finder" || activeStage === "reproduce") && (
+            <EndpointFinderStage data={data} onStageSelect={onStageSelect} />
+          )}
+          {(activeStage === "baseline_test" || activeStage === "measure") && (
+            <BaselineStage
+              data={data}
+              onStageSelect={onStageSelect}
+              investigationStatus={investigationStatus}
+            />
+          )}
+          {(activeStage === "repair" || activeStage === "diagnose") && (
+            <RepairAgentStage
+              data={data}
+              onStageSelect={onStageSelect}
+              investigationStatus={investigationStatus}
+            />
+          )}
+          {activeStage === "candidate_test" && (
+            <CandidateTestStage
+              data={data}
+              onStageSelect={onStageSelect}
+              investigationStatus={investigationStatus}
+            />
+          )}
+          {(activeStage === "verification" || activeStage === "validation") && (
+            <VerificationStage
+              data={data}
+              onStageSelect={onStageSelect}
+              repairAttempt={repairAttempt}
+              maxAttempts={maxAttempts}
+              investigationStatus={investigationStatus}
+            />
+          )}
+          {(activeStage === "human_gate" || activeStage === "verify") && (
+            <HumanDecisionStage
+              data={data}
+              onStageSelect={onStageSelect}
+              repairAttempt={repairAttempt}
+              maxAttempts={maxAttempts}
+              onRetry={onRetry}
+              onReject={onReject}
+            />
+          )}
+          {(activeStage === "pull_request" || activeStage === "approval") && (
+            <RaisingPRStage
+              data={data}
+              onStageSelect={onStageSelect}
+              investigationStatus={investigationStatus}
+            />
+          )}
+        </motion.div>
+      </AnimatePresence>
     </div>
   );
 }
