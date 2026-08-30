@@ -5,6 +5,8 @@ export type AgentState = "IDLE" | "RUNNING" | "PAUSED" | "ERROR" | "AWAITING_INP
 export interface AgentQuestion {
   questionType: string;
   message: string;
+  threadId?: string;
+  toolCallId?: string;
   raw?: any;
 }
 
@@ -69,10 +71,29 @@ export function useTrueForgeAgent(apiUrl: string = "http://localhost:3001/api/ch
                        setThoughts((prev) => prev + tfEvent.content);
                      }
 
-                     if (tfEvent.type === "model.tool_call" || tfEvent.type === "ask_question") {
+                     // Handle tool requests (agent questions and approvals)
+                     if (tfEvent.type === "user.tool_approval_required") {
+                       setQuestion({
+                         questionType: "approval",
+                         message: tfEvent.message || "Tool approval required",
+                         threadId: tfEvent.threadId,
+                         toolCallId: tfEvent.toolCallId,
+                         raw: tfEvent
+                       });
+                       setAgentState("AWAITING_INPUT");
+                     } else if (tfEvent.type === "user.tool_response_required") {
+                       setQuestion({
+                         questionType: "response",
+                         message: tfEvent.message || "Tool response required",
+                         threadId: tfEvent.threadId,
+                         toolCallId: tfEvent.toolCallId,
+                         raw: tfEvent
+                       });
+                       setAgentState("AWAITING_INPUT");
+                     } else if (tfEvent.type === "model.tool_call" || tfEvent.type === "ask_question") {
                        setQuestion({
                          questionType: tfEvent.questionType || "text",
-                         message: tfEvent.message || tfEvent.content || "Agent needs input or approval",
+                         message: tfEvent.message || tfEvent.content || "Agent needs input",
                          raw: tfEvent
                        });
                        setAgentState("AWAITING_INPUT");
@@ -157,21 +178,49 @@ export function useTrueForgeAgent(apiUrl: string = "http://localhost:3001/api/ch
     }
   }, [apiUrl, sessionId]);
 
-  const resumeAgent = useCallback(async (answer?: string) => {
+  const resumeAgent = useCallback(async (answer?: string, decision?: "allow" | "deny", reason?: string) => {
     if (!sessionId) return;
     
     setAgentState("RUNNING");
+    
+    // Capture the current question state to determine endpoint, then clear it
+    const currentQuestion = question;
     setQuestion(null);
     setError(null);
     
     abortControllerRef.current = new AbortController();
 
     try {
-      // Resume by passing the sessionId back to the main route with the message
-      const response = await fetch(apiUrl, {
+      let endpoint = apiUrl;
+      let bodyPayload: any = { sessionId, message: answer || "continue" };
+
+      if (currentQuestion?.threadId && currentQuestion?.toolCallId) {
+        if (currentQuestion.questionType === "approval") {
+          endpoint = `${apiUrl}/${sessionId}/approvals`;
+          bodyPayload = {
+            approvals: [{
+              threadId: currentQuestion.threadId,
+              toolCallId: currentQuestion.toolCallId,
+              decision: decision || "allow",
+              reason: reason || answer
+            }]
+          };
+        } else if (currentQuestion.questionType === "response") {
+          endpoint = `${apiUrl}/${sessionId}/tool-responses`;
+          bodyPayload = {
+            responses: [{
+              threadId: currentQuestion.threadId,
+              toolCallId: currentQuestion.toolCallId,
+              content: answer || ""
+            }]
+          };
+        }
+      }
+
+      const response = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sessionId, message: answer || "continue" }),
+        body: JSON.stringify(bodyPayload),
         signal: abortControllerRef.current.signal,
       });
       
@@ -184,7 +233,7 @@ export function useTrueForgeAgent(apiUrl: string = "http://localhost:3001/api/ch
         setAgentState("ERROR");
       }
     }
-  }, [apiUrl, sessionId]);
+  }, [apiUrl, sessionId, question]);
 
   const stopAgent = useCallback(async () => {
      pauseAgent();
