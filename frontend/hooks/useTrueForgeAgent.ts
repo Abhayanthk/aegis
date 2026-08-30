@@ -99,8 +99,13 @@ export function useTrueForgeAgent(apiUrl: string = "http://localhost:3001/api/ch
                        setAgentState("AWAITING_INPUT");
                      }
                      
-                     if (tfEvent.type === "turn.complete") {
-                       setAgentState("COMPLETED");
+                     if (tfEvent.type === "turn.done") {
+                       const status = tfEvent.turn?.state?.status || tfEvent.turn?.status || tfEvent.status || "completed";
+                       if (status === "error" || status === "failed" || status === "cancelled") {
+                         setAgentState("ERROR");
+                       } else {
+                         setAgentState("COMPLETED");
+                       }
                      }
                    }
                 }
