@@ -23,10 +23,10 @@
 | Requirement | Link |
 | --- | --- |
 | Source code repository | https://github.com/Abhayanthk/aegis |
-| Demo video (~3 min) | **TODO: paste your video URL here** |
+| Demo video (~3 min) | [video URL](https://youtu.be/KVJhn_XQTPY)|
 | What it does + how it uses TrueForge | [Section Below](#how-it-uses-trueforge) |
 | Qodo Code Review Evidence | [Section below](#qodo-code-review-evidence) |
-| Blog post (optional prize) | **TODO: paste your blog post URL here** |
+| Blog post (optional prize) | [Medium Post](https://medium.com/@abhayanth2006/we-gave-an-ai-a-license-to-act-then-spent-48-hours-taking-away-its-license-to-lie-22f6b3b53a08) |
 
 ---
 
