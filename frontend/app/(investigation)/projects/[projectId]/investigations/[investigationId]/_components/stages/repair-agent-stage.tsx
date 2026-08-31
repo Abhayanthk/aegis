@@ -19,10 +19,12 @@ export function RepairAgentStage({
   data,
   onStageSelect,
   investigationStatus = "completed",
+  canAdvance,
 }: {
   data: any;
   onStageSelect: (id: string) => void;
   investigationStatus?: InvestigationStatus;
+  canAdvance?: boolean;
 }) {
   const { diagnosis, repair, target } = data;
 
@@ -250,7 +252,7 @@ export function RepairAgentStage({
       <div className="pt-0">
         <Button
           onClick={() => onStageSelect("candidate_test")}
-          disabled={isRunning}
+          disabled={isRunning || !canAdvance}
           className="h-9 px-5 text-[13px] font-medium bg-[var(--ds-primary)] text-[var(--ds-on-primary)] hover:bg-[var(--ds-primary-hover)] gap-2 border-0 shadow-sm disabled:opacity-50"
         >
           Run candidate test <ArrowRight className="h-3.5 w-3.5" />

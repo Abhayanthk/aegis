@@ -2,6 +2,7 @@
 
 import { usePathname } from "next/navigation";
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
 import {
@@ -41,6 +42,11 @@ const routeTitles: Record<string, string> = {
 export function Navbar() {
   const pathname = usePathname();
   const controls = useInvestigationControls();
+  const [mounted, setMounted] = useState(false);
+  
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Build breadcrumb from pathname
   const segments = pathname.split("/").filter(Boolean);
@@ -104,7 +110,7 @@ export function Navbar() {
         <Link href="/projects" className="font-medium text-[var(--ds-ink-subtle)] hover:text-[var(--ds-ink)] transition-colors">
           AEGIS
         </Link>
-        {breadcrumbContent}
+        {mounted && breadcrumbContent}
       </div>
 
       {/* Center: toolbar actions (hidden during investigation for minimal focus) */}

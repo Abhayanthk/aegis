@@ -226,6 +226,7 @@ Repository Path: <ABSOLUTE PATH TO REPO>
 
 CREATE the experiment config and write it to: <ABSOLUTE PATH>/experiment-config.json
 Install the target repository dependencies using the package manager from the Analyst Report.
+
 Then run the baseline experiment. Return the baseline phase JSON result. Do not interpret
 the verdict, alter target code, or replace a missing test command with a no-op.
 If the playbook cannot be read, stop and report that blocker.

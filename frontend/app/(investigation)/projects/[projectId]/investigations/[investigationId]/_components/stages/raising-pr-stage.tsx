@@ -7,10 +7,14 @@ import type { InvestigationStatus } from "@/app/(investigation)/_components/inve
 
 export function RaisingPRStage({
   data,
+  onStageSelect,
+  investigationStatus = "completed",
+  canAdvance,
 }: {
   data: any;
   onStageSelect?: (id: string) => void;
   investigationStatus?: InvestigationStatus;
+  canAdvance?: boolean;
 }) {
   const { pullRequest, repair, verification } = data;
   const vm = verification?.metrics;

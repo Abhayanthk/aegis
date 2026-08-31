@@ -9,9 +9,10 @@ export function HumanDecisionStage({
   data,
   onStageSelect,
   repairAttempt,
-  maxAttempts,
+  maxAttempts = 3,
   onRetry,
   onReject,
+  canAdvance,
 }: {
   data: any;
   onStageSelect: (id: string) => void;
@@ -19,6 +20,7 @@ export function HumanDecisionStage({
   maxAttempts: number;
   onRetry: () => void;
   onReject: () => void;
+  canAdvance?: boolean;
 }) {
   const { baseline, verification, repair } = data;
   const bm = baseline?.metrics;
@@ -158,7 +160,7 @@ export function HumanDecisionStage({
           <div className="flex items-center gap-3">
             <Button
               onClick={onReject}
-              disabled={isAccepting}
+              disabled={isAccepting || !canAdvance}
               variant="outline"
               className="h-9 px-4 text-[13px] font-medium border border-red-500/40 bg-red-500/10 text-red-400 dark:bg-red-500/10 dark:text-red-400 dark:border-red-500/40 hover:!bg-red-600 hover:!text-white hover:!border-red-600 dark:hover:!bg-red-600 dark:hover:!text-white dark:hover:!border-red-600 [&:hover_*]:!text-white disabled:opacity-40 transition-colors shadow-xs"
             >
@@ -166,7 +168,7 @@ export function HumanDecisionStage({
             </Button>
             <Button
               onClick={onRetry}
-              disabled={retryDisabled || isAccepting}
+              disabled={retryDisabled || isAccepting || !canAdvance}
               variant="outline"
               className="h-9 px-4 text-[13px] font-medium border border-[var(--ds-hairline)] bg-[var(--ds-surface-1)] text-[var(--ds-ink-subtle)] hover:!bg-white hover:!text-black hover:!border-white dark:hover:!bg-white dark:hover:!text-black dark:hover:!border-white [&:hover_*]:!text-black disabled:opacity-40 transition-colors shadow-xs"
             >
@@ -180,7 +182,7 @@ export function HumanDecisionStage({
 
           <Button
             onClick={handleAccept}
-            disabled={isAccepting}
+            disabled={isAccepting || !canAdvance}
             className="h-9 px-5 text-[13px] font-medium bg-[var(--ds-primary)] text-[var(--ds-on-primary)] hover:bg-[var(--ds-primary-hover)] gap-2 border-0 shadow-sm disabled:opacity-50"
           >
             {isAccepting ? (

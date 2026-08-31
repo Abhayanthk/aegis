@@ -1,6 +1,7 @@
 import { Request, Response, Router } from "express";
 import { TrueForgeApi } from "@truefoundry/trueforge-sdk";
 import { AGENT_NAME, trueForgeClient } from "../services/trueforge";
+import { dbService } from "../services/database";
 
 const router = Router();
 
@@ -11,6 +12,33 @@ type StreamEvent = {
 
 type StreamWithMetadata = {
   withMetadata(): AsyncIterable<StreamEvent>;
+};
+
+type InvestigationStage =
+  | "repo_context"
+  | "repo_analyzer"
+  | "endpoint_finder"
+  | "baseline_test"
+  | "repair"
+  | "candidate_test"
+  | "verification"
+  | "human_gate"
+  | "pull_request";
+
+type ProgressStatus = "running" | "completed" | "failed" | "awaiting_input";
+
+/**
+ * Stable, UI-facing projection of a TrueForge event. The raw event remains in
+ * the `trueforge` SSE event; consumers should use this event for progress UI.
+ */
+type AgentProgressEvent = {
+  version: 1;
+  type: "agent.progress";
+  sessionId: string;
+  sequenceNumber: string | null;
+  occurredAt: string;
+  thread: { id: string | null; parentId: string | null; name: string };
+  progress: { stage: InvestigationStage; status: ProgressStatus; message: string };
 };
 
 type ApprovalInput = {
@@ -49,6 +77,70 @@ function writeSse(res: Response, event: string, data: unknown, id?: string): voi
   res.write(`data: ${JSON.stringify(data)}\n\n`);
 }
 
+function stageForAgent(name: string): InvestigationStage {
+  const value = name.toLowerCase();
+  if (value.includes("analyst") || value.includes("repository")) return "repo_analyzer";
+  if (value.includes("endpoint") || value.includes("route")) return "endpoint_finder";
+  if (value.includes("candidate")) return "candidate_test";
+  if (value.includes("verif")) return "verification";
+  if (value.includes("repair") || value.includes("diagnos")) return "repair";
+  if (value.includes("pull request") || value.includes("pull-request") || value.startsWith("pr ")) return "pull_request";
+  if (value.includes("review") || value.includes("human") || value.includes("question")) return "human_gate";
+  if (value.includes("profiler") || value.includes("baseline")) return "baseline_test";
+  return "repo_context";
+}
+
+function normalizeProgress(
+  sessionId: string,
+  event: TrueForgeApi.TurnStreamingEvent,
+  sequenceNumber?: string,
+): AgentProgressEvent | null {
+  const occurredAt = "createdAt" in event && event.createdAt ? event.createdAt : new Date().toISOString();
+  const threadId = "threadId" in event ? event.threadId ?? null : null;
+  const parentId = "parent" in event && event.parent ? event.parent.threadId : null;
+  let name = threadId === "main" || threadId === null ? "AEGIS Coordinator" : "Agent";
+  let status: ProgressStatus | null = null;
+  let message = "";
+
+  if (event.type === "thread.created") {
+    name = event.agentInfo.name || event.title;
+    status = "running";
+    message = `${name} started`;
+  } else if (event.type === "thread.done") {
+    name = event.title || name;
+    status = event.state.status === "error" ? "failed" : "completed";
+    message = status === "failed" && event.state.status === "error"
+      ? `${name} failed: ${event.state.error}`
+      : `${name} ${status}`;
+  } else if (event.type === "sandbox.created") {
+    status = "running";
+    message = "Sandbox ready";
+  } else if (event.type === "tool.approval_required" || event.type === "tool.response_required") {
+    status = "awaiting_input";
+    name = "Human review";
+    message = "Agent is waiting for input";
+  } else if (event.type === "turn.done") {
+    status = event.state.status === "error" || event.state.status === "cancelled" ? "failed" : "completed";
+    const detail = event.state.status === "error"
+      ? event.state.message
+      : event.state.status === "cancelled"
+        ? event.state.reason
+        : null;
+    message = detail ? `Investigation ${status}: ${detail}` : `Investigation ${status}`;
+  }
+
+  if (!status) return null;
+  return {
+    version: 1,
+    type: "agent.progress",
+    sessionId,
+    sequenceNumber: sequenceNumber ?? null,
+    occurredAt,
+    thread: { id: threadId, parentId, name },
+    progress: { stage: status === "awaiting_input" ? "human_gate" : stageForAgent(name), status, message },
+  };
+}
+
 async function forwardStream(
   req: Request,
   res: Response,
@@ -60,15 +152,26 @@ async function forwardStream(
     disconnected = true;
   };
 
-  req.once("close", onClose);
+  // `req.close` fires after Express has consumed the request body; it is not a
+  // reliable signal that the SSE client went away. Listen to the response and
+  // an actual request abort so a long-running TrueForge turn keeps forwarding.
+  res.once("close", onClose);
+  req.once("aborted", onClose);
 
   try {
     for await (const { data: event, id } of stream.withMetadata()) {
       if (disconnected) break;
+      console.log(`[TrueForge] [Session ${sessionId}] Event: ${event.type}`);
       writeSse(res, "trueforge", { sessionId, sequenceNumber: id ?? null, event }, id);
+      const progress = normalizeProgress(sessionId, event, id);
+      if (progress) {
+        console.log(`[TrueForge] [Session ${sessionId}] Progress: ${progress.progress.stage} ${progress.progress.status}`);
+        writeSse(res, "progress", progress);
+      }
     }
   } finally {
-    req.off("close", onClose);
+    res.off("close", onClose);
+    req.off("aborted", onClose);
     if (!disconnected && !res.writableEnded) res.end();
   }
 }
@@ -102,21 +205,14 @@ async function streamTurn(
   }
 }
 
-// Helper to construct the system prompt based on user's requirements
 const constructPrompt = (repoUrl: string) => {
-  return `Use the aegis-runtime-reliability-v3 skill on ${repoUrl}
+  return `Use the aegis-runtime-reliability-v3 skill on ${repoUrl}.
 
-Before you take any action or launch any subagents, you MUST read the newly updated skill instructions at \`/opt/tf/skills/aegis-runtime-reliability-v3/SKILL.md\`. I have updated the State Machine and the Startup Checklist, and you must follow them strictly:
-
-1. **Parallel Execution:** You must launch the \`Repository Analyst\` and \`Runtime Profiler preparation\` subagents in parallel as your very first action.
-2. **Data Handoff:** Wait for both to complete. DO NOT analyze the repository yourself. Extract the Analyst's structured JSON report verbatim and pass it directly into the \`Runtime Profiler baseline\` subagent prompt. 
-3. **Target Dependencies:** Remember that target dependencies are now installed by the Baseline subagent, using the package manager identified in the Analyst Report.
-4. **Batched Fixes:** When you reach the DIAGNOSE phase, you MUST instruct the Repairer to apply Batched Fixes for ALL suspect bottlenecks found by the Analyst simultaneously. Do not limit it to just one endpoint.
-5. **Full Autonomy:** Do NOT ask me for permission to repair. Let the Repairer edit the code and let the Profiler run the Candidate test completely autonomously. You may ONLY use the ask_question tool at the very end of the pipeline when the candidate is verified (the final REVIEW gate).`;
+Before taking any action or launching subagents, read \`/opt/tf/skills/aegis-runtime-reliability-v3/SKILL.md\` and follow its current state machine, parallel-execution rules, and approval gates exactly. The skill is the source of truth.`;
 };
 
 router.post("/", async (req: Request, res: Response) => {
-  const { message, sessionId, repoUrl } = req.body as { message?: unknown; sessionId?: unknown; repoUrl?: unknown };
+  const { message, sessionId, repoUrl, investigationId } = req.body as { message?: unknown; sessionId?: unknown; repoUrl?: unknown; investigationId?: unknown };
 
   const prompt = isNonEmptyString(repoUrl) ? constructPrompt(repoUrl) : message;
 
@@ -134,6 +230,10 @@ router.post("/", async (req: Request, res: Response) => {
     const activeSessionId = sessionId ?? (await trueForgeClient.sessions.create({
       agent: { name: AGENT_NAME },
     })).data.id;
+
+    if (investigationId && isNonEmptyString(investigationId as string)) {
+      dbService.updateInvestigation(investigationId as string, activeSessionId, 'running', null);
+    }
 
     await streamTurn(req, res, activeSessionId, [
       { type: "user.message", content: prompt.trim() },
