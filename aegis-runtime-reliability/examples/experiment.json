@@ -1,0 +1,17 @@
+{
+  "start_command": "npm start",
+  "target_endpoint": "http://localhost:3001/api/process",
+  "request_method": "POST",
+  "request_payload": {
+    "data": "sample workload payload for event-loop starvation"
+  },
+  "duration_seconds": 20,
+  "connections": 50,
+  "rate": 0,
+  "pipelining": 1,
+  "health_probe_path": "http://localhost:3001/health",
+  "health_probe_interval_ms": 500,
+  "warmup_seconds": 3,
+  "startup_timeout_ms": 30000,
+  "event_loop_resolution_ms": 20
+}

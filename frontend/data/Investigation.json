@@ -1,0 +1,616 @@
+{
+  "investigation": {
+    "id": "A91F",
+    "runId": "run_01J9A91F",
+    "title": "Node.js event-loop reliability",
+    "status": "completed",
+    "verdict": "verified",
+    "attempt": 1,
+    "maxAttempts": 3,
+
+    "repository": {
+      "name": "orders-api",
+      "owner": "Abhyanthk",
+      "branch": "main",
+      "url": "https://github.com/Abhyanthk/orders-api",
+      "commit": "7f31a92"
+    },
+
+    "target": {
+      "method": "POST",
+      "endpoint": "/orders/process",
+      "description": "Order processing endpoint"
+    },
+
+    "configuration": {
+      "workload": {
+        "type": "representative",
+        "requestsPerSecond": 100
+      },
+      "healthProbe": {
+        "endpoint": "/healthz",
+        "intervalMs": 1000
+      },
+      "verification": {
+        "functionalTests": true,
+        "lint": true,
+        "typecheck": true,
+        "runtimeBenchmark": true
+      }
+    },
+
+    "currentStage": "pull_request",
+
+    "stages": [
+      {
+        "id": "discover",
+        "name": "Discover",
+        "status": "completed",
+        "description": "Repository mapped",
+        "startedAt": "2026-08-29T14:02:01Z",
+        "completedAt": "2026-08-29T14:02:18Z"
+      },
+      {
+        "id": "reproduce",
+        "name": "Reproduce",
+        "status": "completed",
+        "description": "Failure reproduced",
+        "startedAt": "2026-08-29T14:03:01Z",
+        "completedAt": "2026-08-29T14:03:31Z"
+      },
+      {
+        "id": "measure",
+        "name": "Measure",
+        "status": "completed",
+        "description": "Baseline captured",
+        "startedAt": "2026-08-29T14:04:01Z",
+        "completedAt": "2026-08-29T14:04:28Z"
+      },
+      {
+        "id": "diagnose",
+        "name": "Diagnose",
+        "status": "completed",
+        "description": "Cause isolated",
+        "startedAt": "2026-08-29T14:05:01Z",
+        "completedAt": "2026-08-29T14:05:22Z"
+      },
+      {
+        "id": "repair",
+        "name": "Repair",
+        "status": "completed",
+        "description": "Minimal patch prepared",
+        "startedAt": "2026-08-29T14:06:01Z",
+        "completedAt": "2026-08-29T14:06:23Z"
+      },
+      {
+        "id": "validation",
+        "name": "Local validation",
+        "status": "completed",
+        "description": "Patch checked",
+        "startedAt": "2026-08-29T14:07:01Z",
+        "completedAt": "2026-08-29T14:07:17Z"
+      },
+      {
+        "id": "verify",
+        "name": "Verify",
+        "status": "completed",
+        "description": "Same workload rerun",
+        "startedAt": "2026-08-29T14:08:01Z",
+        "completedAt": "2026-08-29T14:08:31Z"
+      },
+      {
+        "id": "approval",
+        "name": "Approval",
+        "status": "completed",
+        "description": "Human gate approved",
+        "startedAt": "2026-08-29T14:08:31Z",
+        "completedAt": "2026-08-29T14:08:48Z"
+      },
+      {
+        "id": "pull_request",
+        "name": "Pull request",
+        "status": "completed",
+        "description": "Pull request created",
+        "startedAt": "2026-08-29T14:09:01Z",
+        "completedAt": "2026-08-29T14:09:06Z"
+      }
+    ],
+
+    "agents": [
+      {
+        "id": "root",
+        "name": "AEGIS Root Agent",
+        "role": "Orchestrator",
+        "status": "completed"
+      },
+      {
+        "id": "repository-analyst",
+        "name": "Repository Analyst",
+        "role": "Repository discovery",
+        "status": "completed"
+      },
+      {
+        "id": "runtime-profiler",
+        "name": "Runtime Profiler",
+        "role": "Runtime reproduction and measurement",
+        "status": "completed"
+      },
+      {
+        "id": "performance-repairer",
+        "name": "Performance Repairer",
+        "role": "Minimal performance repair",
+        "status": "completed"
+      },
+      {
+        "id": "verification",
+        "name": "Verification",
+        "role": "Deterministic verification",
+        "status": "completed"
+      }
+    ],
+
+    "activeAgent": {
+      "id": "verification",
+      "name": "Verification",
+      "status": "completed",
+      "message": "No action pending"
+    },
+
+    "sandbox": {
+      "id": "daytona-7f2a",
+      "provider": "Daytona",
+      "runtime": "node 20.11",
+      "status": "completed",
+      "durationMs": 511000
+    },
+
+    "discovery": {
+      "runtime": "node 20.11",
+      "entrypoint": "src/server.ts",
+      "endpoint": "POST /orders/process",
+      "healthEndpoint": "GET /healthz",
+
+      "suspiciousPaths": [
+        {
+          "file": "src/orders/process.ts",
+          "reason": "Synchronous CPU-bound risk scoring runs inside the request handler on the main thread.",
+          "severity": "high"
+        }
+      ],
+
+      "filesInspected": 42,
+      "filesRelevant": 3
+    },
+
+    "reproduction": {
+      "status": "reproduced",
+      "workload": {
+        "requestsPerSecond": 100,
+        "durationSeconds": 30
+      },
+      "healthAvailability": 16,
+      "runtime": "node 20.11",
+      "failure": "Event-loop starvation under concurrent traffic"
+    },
+
+    "baseline": {
+      "status": "captured",
+
+      "metrics": {
+        "eventLoopP99": {
+          "value": 4217,
+          "unit": "ms",
+          "target": 52
+        },
+
+        "healthAvailability": {
+          "value": 16,
+          "unit": "%"
+        },
+
+        "endpointP99": {
+          "value": 5102,
+          "unit": "ms",
+          "threshold": 100
+        },
+
+        "functionalTests": {
+          "passed": 100,
+          "total": 100
+        }
+      },
+
+      "summary": "The endpoint completes functionally, but CPU-bound work monopolizes the Node.js main thread and causes severe event-loop starvation."
+    },
+
+    "diagnosis": {
+      "title": "Event-loop starvation",
+      "severity": "high",
+
+      "primaryFinding": {
+        "title": "Synchronous CPU-bound work blocks the Node.js main thread",
+        "affectedEndpoint": "POST /orders/process",
+        "cause": "Risk scoring executes synchronously inside the request handler."
+      },
+
+      "evidence": [
+        {
+          "type": "profile",
+          "file": "src/orders/process.ts",
+          "description": "CPU profile shows synchronous risk scoring on the main thread."
+        },
+        {
+          "type": "runtime",
+          "metric": "eventLoopP99",
+          "value": 4217,
+          "unit": "ms"
+        },
+        {
+          "type": "health",
+          "metric": "availability",
+          "value": 16,
+          "unit": "%"
+        }
+      ],
+
+      "confidence": 94
+    },
+
+    "repair": {
+      "status": "verified",
+      "title": "Move the hot path off the main thread",
+
+      "strategy": "Worker offload",
+      "riskSurface": "Minimal",
+
+      "description": "Delegate CPU-bound risk scoring to the existing worker boundary without changing the public API contract.",
+
+      "filesChanged": 2,
+
+      "files": [
+        {
+          "path": "src/orders/process.ts",
+          "changes": {
+            "added": 2,
+            "removed": 2
+          }
+        },
+        {
+          "path": "src/workers/risk-worker.ts",
+          "changes": {
+            "added": 8,
+            "removed": 0
+          }
+        }
+      ],
+
+      "diff": {
+        "file": "src/orders/process.ts",
+        "before": [
+          "const result = calculateRiskScore(order);",
+          "return persistOrder({ ...order, result });"
+        ],
+        "after": [
+          "const result = await riskWorker.calculate(order);",
+          "return persistOrder({ ...order, result });"
+        ]
+      },
+
+      "attempt": 1,
+      "maxAttempts": 3
+    },
+
+    "validation": {
+      "status": "passed",
+
+      "checks": [
+        {
+          "name": "Functional test suite",
+          "status": "passed",
+          "result": "100 / 100 passed"
+        },
+        {
+          "name": "TypeScript check",
+          "status": "passed",
+          "result": "clean"
+        },
+        {
+          "name": "Lint and formatting",
+          "status": "passed",
+          "result": "clean"
+        },
+        {
+          "name": "Changed files",
+          "status": "passed",
+          "result": "2 reviewed"
+        }
+      ]
+    },
+
+    "verification": {
+      "status": "verified",
+      "sameWorkload": true,
+
+      "metrics": {
+        "eventLoopP99": {
+          "before": 4217,
+          "after": 3.2,
+          "unit": "ms",
+          "passed": true
+        },
+
+        "healthAvailability": {
+          "before": 16,
+          "after": 100,
+          "unit": "%",
+          "passed": true
+        },
+
+        "endpointP99": {
+          "before": 5102,
+          "after": 52,
+          "unit": "ms",
+          "passed": true
+        },
+
+        "functionalTests": {
+          "before": 100,
+          "after": 100,
+          "total": 100,
+          "passed": true
+        }
+      },
+
+      "summary": "The repair passed deterministic verification using the same workload and measurement protocol."
+    },
+
+    "approval": {
+      "status": "approved",
+      "required": true,
+      "approvedBy": "human",
+      "approvedAt": "2026-08-29T14:08:48Z",
+      "message": "Verified repair approved for GitHub write."
+    },
+
+    "pullRequest": {
+      "status": "open",
+      "number": 42,
+
+      "branch": {
+        "name": "aegis/fix-a91f",
+        "base": "main"
+      },
+
+      "commit": {
+        "sha": "8d3c1f2",
+        "message": "fix: prevent event-loop starvation"
+      },
+
+      "title": "Fix Node.js event-loop starvation",
+      "description": "Move CPU-bound risk scoring off the Node.js main thread after deterministic runtime verification."
+    },
+
+    "qodoReview": {
+      "status": "passed",
+      "reviewId": "qodo_91af",
+      "summary": "No blocking issues found. Repair is ready for human merge.",
+      "blockingIssues": 0,
+      "warnings": 0
+    },
+
+    "evidence": [
+      {
+        "id": "ev_001",
+        "timestamp": "2026-08-29T14:02:01Z",
+        "agent": "Repository Analyst",
+        "event": "github.read_file",
+        "description": "package.json inspected"
+      },
+      {
+        "id": "ev_002",
+        "timestamp": "2026-08-29T14:02:04Z",
+        "agent": "Repository Analyst",
+        "event": "runtime.detect",
+        "description": "Node.js 20.11 detected"
+      },
+      {
+        "id": "ev_003",
+        "timestamp": "2026-08-29T14:02:08Z",
+        "agent": "Repository Analyst",
+        "event": "path.rank",
+        "description": "src/orders/process.ts identified as suspicious path"
+      },
+      {
+        "id": "ev_004",
+        "timestamp": "2026-08-29T14:03:12Z",
+        "agent": "Runtime Profiler",
+        "event": "sandbox.start",
+        "description": "Daytona sandbox started"
+      },
+      {
+        "id": "ev_005",
+        "timestamp": "2026-08-29T14:03:18Z",
+        "agent": "Runtime Profiler",
+        "event": "workload.run",
+        "description": "100 requests/sec workload started"
+      },
+      {
+        "id": "ev_006",
+        "timestamp": "2026-08-29T14:03:22Z",
+        "agent": "Runtime Profiler",
+        "event": "health.probe",
+        "description": "Health availability dropped to 16%"
+      },
+      {
+        "id": "ev_007",
+        "timestamp": "2026-08-29T14:04:28Z",
+        "agent": "Runtime Profiler",
+        "event": "evidence.lock",
+        "description": "Baseline evidence locked"
+      },
+      {
+        "id": "ev_008",
+        "timestamp": "2026-08-29T14:05:17Z",
+        "agent": "Runtime Profiler",
+        "event": "cause.isolate",
+        "description": "Synchronous CPU work isolated"
+      },
+      {
+        "id": "ev_009",
+        "timestamp": "2026-08-29T14:06:18Z",
+        "agent": "Performance Repairer",
+        "event": "patch.prepare",
+        "description": "2 files changed"
+      },
+      {
+        "id": "ev_010",
+        "timestamp": "2026-08-29T14:07:01Z",
+        "agent": "Performance Repairer",
+        "event": "npm.test",
+        "description": "100 / 100 tests passed"
+      },
+      {
+        "id": "ev_011",
+        "timestamp": "2026-08-29T14:08:31Z",
+        "agent": "Verification",
+        "event": "verifier.complete",
+        "description": "Repair verified"
+      },
+      {
+        "id": "ev_012",
+        "timestamp": "2026-08-29T14:08:31Z",
+        "agent": "AEGIS",
+        "event": "github.write_lock",
+        "description": "Waiting for human approval"
+      },
+      {
+        "id": "ev_013",
+        "timestamp": "2026-08-29T14:08:48Z",
+        "agent": "AEGIS",
+        "event": "human.gate",
+        "description": "Approval received"
+      },
+      {
+        "id": "ev_014",
+        "timestamp": "2026-08-29T14:09:04Z",
+        "agent": "AEGIS",
+        "event": "github.commit",
+        "description": "Patch committed"
+      },
+      {
+        "id": "ev_015",
+        "timestamp": "2026-08-29T14:09:06Z",
+        "agent": "AEGIS",
+        "event": "github.open_pr",
+        "description": "Pull request #42 opened"
+      },
+      {
+        "id": "ev_016",
+        "timestamp": "2026-08-29T14:09:40Z",
+        "agent": "Qodo",
+        "event": "qodo.review_pass",
+        "description": "Automated review passed"
+      }
+    ],
+
+    "runSummary": {
+      "investigationId": "A91F",
+      "quality": {
+        "score": 94
+      },
+
+      "performance": {
+        "totalDurationMs": 27400
+      },
+
+      "cost": {
+        "totalUsd": 0.069
+      },
+
+      "latency": [
+        {
+          "agentId": "root",
+          "agentName": "Root Agent",
+          "durationMs": 3200,
+          "percentage": 11.7
+        },
+        {
+          "agentId": "repository-analyst",
+          "agentName": "Repository Analyst",
+          "durationMs": 5100,
+          "percentage": 18.6
+        },
+        {
+          "agentId": "runtime-profiler",
+          "agentName": "Runtime Profiler",
+          "durationMs": 12400,
+          "percentage": 45.3
+        },
+        {
+          "agentId": "performance-repairer",
+          "agentName": "Repair",
+          "durationMs": 4200,
+          "percentage": 15.3
+        },
+        {
+          "agentId": "verification",
+          "agentName": "Verification",
+          "durationMs": 2500,
+          "percentage": 9.1
+        }
+      ],
+
+      "costBreakdown": [
+        {
+          "agentId": "repository-analyst",
+          "agentName": "Repository Analyst",
+          "costUsd": 0.031
+        },
+        {
+          "agentId": "runtime-profiler",
+          "agentName": "Runtime Profiler",
+          "costUsd": 0.014
+        },
+        {
+          "agentId": "performance-repairer",
+          "agentName": "Repair",
+          "costUsd": 0.024
+        }
+      ],
+
+      "verification": {
+        "eventLoop": {
+          "before": 4217,
+          "after": 3.2,
+          "unit": "ms",
+          "passed": true
+        },
+        "healthAvailability": {
+          "before": 16,
+          "after": 100,
+          "unit": "%",
+          "passed": true
+        },
+        "endpointP99": {
+          "before": 5102,
+          "after": 52,
+          "unit": "ms",
+          "passed": true
+        },
+        "functionalTests": {
+          "before": 100,
+          "after": 100,
+          "total": 100,
+          "passed": true
+        }
+      },
+
+      "verdict": "verified"
+    },
+
+    "timestamps": {
+      "startedAt": "2026-08-29T14:02:01Z",
+      "completedAt": "2026-08-29T14:09:40Z"
+    }
+  }
+}
