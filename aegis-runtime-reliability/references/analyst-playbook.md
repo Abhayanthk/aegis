@@ -97,6 +97,9 @@ Return your findings as structured JSON:
    configuration. Return the exact runnable command and its source. If no real
    suite exists, set both `test_directory` and `test_command` to `null` and set
    `test_command_source` to `none`; never invent a test command.
+   Write the completed JSON report atomically to the absolute artifact path
+   supplied in the task prompt (write a temporary file in the same directory,
+   then rename it). The PREPARE profiler consumes that artifact.
 8. **Identify the package manager.** A runnable manager requires its matching
    lockfile: `package-lock.json`, `pnpm-lock.yaml`, or `yarn.lock`. Report only
    `npm`, `pnpm`, `yarn`, or `unknown` in `package_manager`. Include
