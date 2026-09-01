@@ -4,12 +4,13 @@ import dotenv from "dotenv";
 dotenv.config();
 
 const baseUrl = process.env.TRUEFORGE_URL || "http://localhost:8790";
-// The TrueForge documentation and the user setup indicated auth is disabled locally.
-const apiKey = process.env.TRUEFORGE_API_KEY || ""; 
+const configuredTimeout = Number(process.env.TRUEFORGE_TIMEOUT_SECONDS ?? "600");
 
 export const trueForgeClient = new TrueForge({
   baseUrl,
-  token: apiKey || undefined,
+  timeoutInSeconds: Number.isFinite(configuredTimeout) && configuredTimeout > 0
+    ? configuredTimeout
+    : 600,
 });
 
 export const AGENT_NAME = process.env.AGENT_NAME || "aegis-orchestrator";
