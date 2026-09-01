@@ -10,10 +10,14 @@ export function RepoAnalyzerStage({
   data,
   onStageSelect,
   investigationStatus = "completed",
+  canAdvance,
+  stageStatus,
 }: {
   data: any;
   onStageSelect: (id: string) => void;
   investigationStatus?: InvestigationStatus;
+  canAdvance?: boolean;
+  stageStatus?: "completed" | "active" | "pending" | "failed";
 }) {
   const discovery = data?.discovery;
   const diagnosis = data?.diagnosis;
@@ -29,8 +33,8 @@ export function RepoAnalyzerStage({
 
   // Determine stage state
   const isPaused = investigationStatus === "paused" || investigationStatus === "pausing";
-  const isFailed = investigationStatus === "failed";
-  const isAnalyzing = investigationStatus === "running" && data?.status === "analyzing";
+  const isFailed = stageStatus === "failed" || investigationStatus === "failed";
+  const isAnalyzing = stageStatus === "active" || (investigationStatus === "running" && data?.status === "analyzing");
 
   const statusType: "analyzing" | "completed" | "failed" | "paused" = isPaused
     ? "paused"
@@ -330,11 +334,10 @@ export function RepoAnalyzerStage({
         </div>
       </div>
 
-      {/* Primary Action Button */}
       <div className="pt-0">
         <Button
           onClick={() => onStageSelect("endpoint_finder")}
-          disabled={statusType === "analyzing"}
+          disabled={statusType === "analyzing" || !canAdvance}
           className="h-9 px-5 text-[13px] font-medium bg-[var(--ds-primary)] text-[var(--ds-on-primary)] hover:bg-[var(--ds-primary-hover)] gap-2 border-0 shadow-sm disabled:opacity-50"
         >
           Find testable endpoints <ArrowRight className="h-3.5 w-3.5" />

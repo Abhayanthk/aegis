@@ -4,7 +4,7 @@ import { motion } from "motion/react";
 import { FolderGit2, ArrowRight, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-export function RepoInfoStage({ data, onStageSelect }: { data: any; onStageSelect: (id: string) => void }) {
+export function RepoInfoStage({ data, onStageSelect, canAdvance }: { data: any; onStageSelect: (id: string) => void; canAdvance?: boolean; }) {
   const repository = data?.repository;
   const discovery = data?.discovery;
   const target = data?.target;

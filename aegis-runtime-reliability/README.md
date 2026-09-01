@@ -28,7 +28,9 @@ aegis-runtime-reliability/
 │   └── verification-policy.json          # Gate thresholds and policy rules
 ├── references/
 │   ├── analyst-playbook.md               # Static analysis guide for Repository Analyst
-│   ├── profiler-playbook.md              # Experiment execution guide for Runtime Profiler
+│   ├── preparation-playbook.md           # Runtime/dependency setup only
+│   ├── baseline-playbook.md              # Baseline experiment only
+│   ├── candidate-playbook.md             # Candidate experiment and verification only
 │   ├── repairer-playbook.md              # Repair decision tree for Performance Repairer
 │   ├── evidence-contract.md              # What constitutes valid evidence
 │   └── verification-contract.md          # Verifier semantics and verdict handling
@@ -151,7 +153,9 @@ This PR introduces the `aegis-runtime-reliability` TrueForge skill — a complet
 | `scripts/verify.mjs` | Deterministic verdict engine | ~230 |
 | `config/verification-policy.json` | Gate thresholds and policy rules | ~55 |
 | `references/analyst-playbook.md` | Repository Analyst instructions | ~100 |
-| `references/profiler-playbook.md` | Runtime Profiler instructions | ~100 |
+| `references/preparation-playbook.md` | PREPARE setup instructions |
+| `references/baseline-playbook.md` | BASELINE experiment instructions |
+| `references/candidate-playbook.md` | CANDIDATE experiment instructions |
 | `references/repairer-playbook.md` | Performance Repairer decision tree | ~250 |
 | `references/evidence-contract.md` | Evidence validity definitions | ~130 |
 | `references/verification-contract.md` | Verifier semantics and verdicts | ~170 |

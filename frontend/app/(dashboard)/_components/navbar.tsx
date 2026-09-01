@@ -3,6 +3,7 @@
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
 import {
@@ -42,8 +43,10 @@ export function Navbar() {
   const controls = useInvestigationControls();
   const [searchOpen, setSearchOpen] = useState(false);
   const [isMac, setIsMac] = useState(true);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
     setIsMac(typeof navigator !== 'undefined' && navigator.platform.toUpperCase().indexOf('MAC') >= 0);
     const down = (e: KeyboardEvent) => {
       if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
@@ -117,7 +120,7 @@ export function Navbar() {
         <Link href="/projects" className="font-medium text-[var(--ds-ink-subtle)] hover:text-[var(--ds-ink)] transition-colors">
           AEGIS
         </Link>
-        {breadcrumbContent}
+        {mounted && breadcrumbContent}
       </div>
 
       {/* Spacer */}

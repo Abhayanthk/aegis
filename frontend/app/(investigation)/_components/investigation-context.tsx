@@ -23,6 +23,7 @@ interface InvestigationControlsState {
   onConfirmCancel: () => void;
   onDismissCancel: () => void;
   setStatus: (status: InvestigationStatus) => void;
+  registerCallbacks: (callbacks: { pauseAgent: () => void; resumeAgent: () => void; stopAgent: () => void }) => void;
 }
 
 const InvestigationControlsContext =
@@ -44,15 +45,26 @@ export function InvestigationControlsProvider({
 }) {
   const [status, setStatus] = useState<InvestigationStatus>("running");
   const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const callbacksRef = React.useRef<{ pauseAgent?: () => void; resumeAgent?: () => void; stopAgent?: () => void }>({});
+
+  const registerCallbacks = useCallback((callbacks: { pauseAgent: () => void; resumeAgent: () => void; stopAgent: () => void }) => {
+    callbacksRef.current = callbacks;
+  }, []);
 
   const onPause = useCallback(() => {
     setStatus("pausing");
-    // Simulate pausing transition
-    setTimeout(() => setStatus("paused"), 800);
+    if (callbacksRef.current.pauseAgent) {
+      callbacksRef.current.pauseAgent();
+    } else {
+      setTimeout(() => setStatus("paused"), 800);
+    }
   }, []);
 
   const onResume = useCallback(() => {
     setStatus("running");
+    if (callbacksRef.current.resumeAgent) {
+      callbacksRef.current.resumeAgent();
+    }
   }, []);
 
   const onRequestCancel = useCallback(() => {
@@ -62,7 +74,11 @@ export function InvestigationControlsProvider({
   const onConfirmCancel = useCallback(() => {
     setShowCancelDialog(false);
     setStatus("cancelling");
-    setTimeout(() => setStatus("cancelled"), 800);
+    if (callbacksRef.current.stopAgent) {
+      callbacksRef.current.stopAgent();
+    } else {
+      setTimeout(() => setStatus("cancelled"), 800);
+    }
   }, []);
 
   const onDismissCancel = useCallback(() => {
@@ -81,6 +97,7 @@ export function InvestigationControlsProvider({
     onConfirmCancel,
     onDismissCancel,
     setStatus,
+    registerCallbacks,
   };
 
   return (

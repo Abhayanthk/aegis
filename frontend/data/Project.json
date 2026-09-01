@@ -1,6 +1,15 @@
 {
   "projects": [
     {
+      "id": "prj_nodetest",
+      "name": "nodetest",
+      "repository": "Abhayanthk/nodetest",
+      "branch": "main",
+      "status": "new",
+      "latestInvestigation": null,
+      "lastActivity": "Added just now"
+    },
+    {
       "id": "prj_orders",
       "name": "orders-api",
       "repository": "acme/orders-api",

@@ -9,10 +9,12 @@ export function BaselineStage({
   data,
   onStageSelect,
   investigationStatus = "completed",
+  canAdvance,
 }: {
   data: any;
   onStageSelect: (id: string) => void;
   investigationStatus?: InvestigationStatus;
+  canAdvance?: boolean;
 }) {
   const { baseline, reproduction, target, sandbox, configuration } = data;
   const metrics = baseline?.metrics;

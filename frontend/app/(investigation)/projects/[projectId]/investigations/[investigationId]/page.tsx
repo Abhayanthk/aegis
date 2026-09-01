@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
+import { useParams } from "next/navigation";
 import { InvestigationSidebar } from "./_components/investigation-sidebar";
 import { StageContent } from "./_components/stage-content";
 import { LiveTrace } from "./_components/live-trace";
-import investigationData from "@/data/Investigation.json";
 import { useInvestigationControls } from "@/app/(investigation)/_components/investigation-context";
+import { useTrueForgeAgent } from "@/hooks/useTrueForgeAgent";
 
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import {
@@ -31,30 +32,105 @@ const STAGE_ORDER = [
 ];
 
 export default function ProjectInvestigationPage() {
+  const params = useParams();
+  const projectId = params.projectId as string;
+  const investigationId = params.investigationId as string;
+
   const [activeStage, setActiveStage] = useState("repo_context");
-  // Track the highest stage that has been reached (all stages up to this index are completed)
   const [highestReached, setHighestReached] = useState(0);
   const [repairAttempt, setRepairAttempt] = useState(1);
+  const [projectData, setProjectData] = useState<any>(null);
+  const [investigationRecord, setInvestigationRecord] = useState<any>(null);
 
   const controls = useInvestigationControls();
+  const agent = useTrueForgeAgent();
 
-  // Parse JSON data
-  const data = investigationData.investigation as any;
-  const maxAttempts = data.repair?.maxAttempts ?? 3;
+  // Fetch project data and investigation data
+  useEffect(() => {
+    if (projectId && investigationId) {
+      fetch(`/api/projects/${projectId}`)
+        .then(res => res.json())
+        .then(data => setProjectData(data))
+        .catch(console.error);
+
+      fetch(`/api/projects/${projectId}/investigations`)
+        .then(res => res.json())
+        .then(data => {
+          const inv = data.investigations?.find((i: any) => i.id === investigationId);
+          if (inv) setInvestigationRecord(inv);
+        })
+        .catch(console.error);
+    }
+  }, [projectId, investigationId]);
+
+  // Register controls to context
+  useEffect(() => {
+    if (controls?.registerCallbacks) {
+      controls.registerCallbacks({
+        pauseAgent: agent.pauseAgent,
+        resumeAgent: agent.resumeAgent,
+        stopAgent: agent.stopAgent,
+      });
+    }
+  }, [controls, agent.pauseAgent, agent.resumeAgent, agent.stopAgent]);
+
+  // Sync agentState with context status
+  useEffect(() => {
+    if (controls) {
+      if (agent.agentState === "RUNNING") controls.setStatus("running");
+      else if (agent.agentState === "PAUSED") controls.setStatus("paused");
+      else if (agent.agentState === "ERROR") controls.setStatus("failed");
+      else if (agent.agentState === "COMPLETED") controls.setStatus("completed");
+    }
+  }, [agent.agentState, controls]);
+
+  // Make data available to components
+  // Merge loaded static info (like repoUrl) with dynamic investigationData
+  const data = {
+    ...investigationRecord?.data,
+    ...agent.investigationData,
+    repository: {
+      url: projectData?.repo_url,
+      name: projectData?.name,
+      branch: projectData?.branch,
+      ...investigationRecord?.data?.repository,
+      ...agent.investigationData?.repository
+    }
+  };
+
+  // Drive stage state from TrueForge's lifecycle events. This keeps concurrent
+  // subagents independent instead of marking every earlier stage complete.
+  useEffect(() => {
+    const activeStages = STAGE_ORDER.filter((stage) => {
+      const status = agent.stageProgress[stage as keyof typeof agent.stageProgress];
+      return status === "running" || status === "awaiting_input";
+    });
+    if (activeStages.length > 0) setActiveStage(activeStages[activeStages.length - 1]);
+
+    let contiguousCompleted = 0;
+    while (
+      contiguousCompleted < STAGE_ORDER.length - 1 &&
+      agent.stageProgress[STAGE_ORDER[contiguousCompleted] as keyof typeof agent.stageProgress] === "completed"
+    ) {
+      contiguousCompleted += 1;
+    }
+    setHighestReached(contiguousCompleted);
+  }, [agent.stageProgress]);
+
+
+
+  const maxAttempts = data?.repair?.maxAttempts ?? 3;
 
   const handleStageSelect = useCallback((stageId: string) => {
     const newIndex = STAGE_ORDER.indexOf(stageId);
     if (newIndex === -1) return;
 
     setActiveStage(stageId);
-
-    // Mark all stages before the new stage as completed
     if (newIndex > highestReached) {
       setHighestReached(newIndex);
     }
   }, [highestReached]);
 
-  // Compute status for each stage based on highestReached
   const getStageStatus = useCallback((stageId: string): "completed" | "active" | "pending" | "failed" => {
     if (controls?.status === "cancelled") {
       const index = STAGE_ORDER.indexOf(stageId);
@@ -63,16 +139,24 @@ export default function ProjectInvestigationPage() {
       return "pending";
     }
 
+    const streamStatus = agent.stageProgress[stageId as keyof typeof agent.stageProgress];
+    if (streamStatus === "completed") return "completed";
+    if (streamStatus === "running" || streamStatus === "awaiting_input") return "active";
+    if (streamStatus === "failed") return "failed";
+
+    // After a stream has begun, absent status means the agent has not reached
+    // this stage. This is important when two subagents run in parallel.
+    if (Object.keys(agent.stageProgress).length > 0) return "pending";
+
     const index = STAGE_ORDER.indexOf(stageId);
     if (index < highestReached) return "completed";
     if (index === highestReached) return "active";
     return "pending";
-  }, [highestReached, controls?.status]);
+  }, [highestReached, controls?.status, agent.stageProgress]);
 
   const handleRetry = useCallback(() => {
     if (repairAttempt >= maxAttempts) return;
     setRepairAttempt((prev) => prev + 1);
-    // Jump back to repair stage while keeping repo_context, repo_analyzer, endpoint_finder, baseline_test completed
     const repairIndex = STAGE_ORDER.indexOf("repair");
     setActiveStage("repair");
     setHighestReached(repairIndex);
@@ -81,6 +165,14 @@ export default function ProjectInvestigationPage() {
   const handleReject = useCallback(() => {
     controls?.setStatus("cancelled");
   }, [controls]);
+  
+  // Custom wrapper for starting agent to inject URL
+  const handleStartAgent = useCallback((stageId: string) => {
+    if (projectData?.repo_url) {
+      agent.startAgent(projectData.repo_url, investigationId);
+      handleStageSelect(stageId);
+    }
+  }, [projectData?.repo_url, investigationId, agent, handleStageSelect]);
 
   return (
     <>
@@ -103,7 +195,15 @@ export default function ProjectInvestigationPage() {
             <StageContent
               data={data}
               activeStage={activeStage}
-              onStageSelect={handleStageSelect}
+              canAdvance={highestReached > STAGE_ORDER.indexOf(activeStage)}
+              getStageStatus={getStageStatus}
+              onStageSelect={stageId => {
+                if (stageId === 'repo_analyzer' && agent.agentState === 'IDLE') {
+                   handleStartAgent(stageId);
+                } else {
+                   handleStageSelect(stageId);
+                }
+              }}
               investigationStatus={controls?.status ?? "running"}
               repairAttempt={repairAttempt}
               maxAttempts={maxAttempts}
@@ -115,7 +215,15 @@ export default function ProjectInvestigationPage() {
           </div>
         </SidebarInset>
 
-        <LiveTrace data={data} activeStage={activeStage} />
+        <LiveTrace 
+          data={data} 
+          activeStage={activeStage} 
+          traceLog={agent.traceLog} 
+          currentAgent={agent.currentAgent}
+          agentState={agent.agentState}
+          thoughts={agent.thoughts}
+          currentStep={agent.currentStep}
+        />
       </SidebarProvider>
 
       {/* Cancel confirmation dialog */}

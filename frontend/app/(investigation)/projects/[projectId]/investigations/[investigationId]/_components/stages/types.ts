@@ -12,4 +12,6 @@ export interface StageContentProps {
   onReject: () => void;
   onResume?: () => void;
   onPause?: () => void;
+  canAdvance?: boolean;
+  getStageStatus?: (stageId: string) => "completed" | "active" | "pending" | "failed";
 }
