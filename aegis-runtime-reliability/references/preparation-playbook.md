@@ -14,6 +14,11 @@ infer or invent the manager:
 Do not inspect source, create configs, start apps, run tests, experiments, or
 verification. Do not run any other install command.
 
+The setup script owns Node bootstrap. It tries an existing Node >=18, NVM, fnm,
+an official Node binary downloaded into the sandbox, and finally apt when
+available. Do not ask the user to install anything. If all fallbacks fail,
+return the script's complete `SETUP_FAILED` output.
+
 Return only this JSON on success:
 
 ```json
