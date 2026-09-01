@@ -276,8 +276,12 @@ install command in BASELINE; if the preparation marker is missing or invalid,
 stop and report that setup failure.
 Source the durable runtime environment and fail if sourcing fails:
 `source {skill_dir}/.aegis-node-env`.
-Then run the baseline experiment. Return the baseline phase JSON result. Do not interpret
-the verdict, alter target code, or replace a missing test command with a no-op.
+Run `cd <ABSOLUTE PATH TO REPO>` before every command, invoke the harness via
+`{skill_dir}/scripts/run_experiment.mjs` with absolute config/output paths, and
+return the baseline phase JSON result. If the harness exits non-zero, return
+the exact command, exit code, stdout, and stderr as an execution blocker; do
+not synthesize metrics or proceed as if baseline exists. Do not interpret the
+verdict, alter target code, or replace a missing test command with a no-op.
 If the playbook cannot be read, stop and report that blocker.
 ```
 
@@ -289,12 +293,18 @@ You are the Runtime Profiler for the CANDIDATE phase. Before any work, read
 
 You have zero memory of the prior conversation. You must use:
 Analyst Report Artifact: <ABSOLUTE PATH TO analyst-report.json>
+Repository Path: <ABSOLUTE PATH TO REPO>
 Baseline Metrics: <INSERT RAW JSON OR ABSOLUTE PATH TO baseline/metrics.json>
 Experiment Config: <ABSOLUTE PATH TO experiment-config.json>
 
-REUSE the supplied experiment config file (do NOT create a new one). Run the
-candidate experiment, and then run the verification script. Return the candidate phase JSON
-result. Do not interpret the verdict or alter target code. If the playbook
+REUSE the supplied experiment config file (do NOT create a new one). Run
+`cd <ABSOLUTE PATH TO REPO>` before every command and invoke the harness and
+verifier via their absolute `{skill_dir}/scripts/...` paths. Run verification
+only after the experiment exits 0. If `run_experiment.mjs` exits non-zero,
+return the exact command, exit code, stdout, and stderr as an execution
+blocker; do not synthesize metrics or a verdict and do not classify it as a
+performance `FAILED` result. Return the candidate phase JSON result only after
+the successful experiment and verification. Do not interpret the verdict or alter target code. If the playbook
 cannot be read, stop and report that blocker.
 ```
 
@@ -322,12 +332,16 @@ verdict. If the playbook cannot be read, stop and report that blocker.
 ### `scripts/run_experiment.mjs`
 
 ```
-node scripts/run_experiment.mjs --config <experiment-config.json> --output <metrics.json>
+cd <repository-path> && node <skill_dir>/scripts/run_experiment.mjs \
+  --config <absolute experiment-config.json> --output <absolute metrics.json>
 ```
 
 - **Exit 0**: Experiment completed. Metrics JSON written to `--output` path.
 - **Exit non-zero**: Experiment crashed. NO metrics file written.
   **You must not proceed as if results exist.**
+- A non-zero experiment exit is an execution/measurement blocker, not a
+  verifier `FAILED` verdict and not a repair attempt. Preserve the exact
+  command, exit status, stdout, and stderr.
 - **Metrics schema**: `{ protocol_hash, event_loop, health, target, functional }`
 - **Protocol hash**: Deterministic — same inputs always produce the same hash.
   Baseline and candidate MUST use the same experiment config to be comparable.
@@ -352,17 +366,20 @@ interactive tool's stdout/stderr pipes and the tool never reaches completion.
 ### `scripts/verify.mjs`
 
 ```
-node scripts/verify.mjs --baseline <baseline/metrics.json> \
-                         --candidate <candidate/metrics.json> \
-                         --policy config/verification-policy.json \
-                         --output <verdict.json>
+cd <repository-path> && node <skill_dir>/scripts/verify.mjs \
+                         --baseline <absolute baseline/metrics.json> \
+                         --candidate <absolute candidate/metrics.json> \
+                         --policy <skill_dir>/config/verification-policy.json \
+                         --output <absolute verdict.json>
 ```
 
 - **Exit 0**: Verifier ran successfully. Read the `verdict` field in the JSON.
 - **Exit non-zero**: Verifier itself crashed (script error, missing file).
   This is NOT the same as a FAILED verdict.
 - **Verdict values**: `VERIFIED | FAILED | RETRY | ESCALATE | INCOMPARABLE`
-- **You must route on the verdict field, not on the exit code.**
+- **You must route on the verdict field, not on the exit code**, but only after
+  the experiment exited 0 and produced metrics. A verifier crash is also an
+  execution/measurement blocker, not a performance verdict.
 
 ---
 
