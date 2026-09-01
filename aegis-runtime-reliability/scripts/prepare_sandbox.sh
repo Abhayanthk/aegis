@@ -10,21 +10,75 @@ skill_dir="$(cd "$(dirname "$0")/.." && pwd)"
 marker="$skill_dir/.aegis-prepared"
 runtime_env="$skill_dir/.aegis-node-env"
 
-if ! command -v node >/dev/null 2>&1; then
+node_usable() {
+  command -v node >/dev/null 2>&1 && command -v npm >/dev/null 2>&1 || return 1
+  local major
+  major="$(node -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo 0)"
+  (( major >= 18 ))
+}
+
+provision_node() {
+  # Prefer an existing version manager because it handles architecture.
   if [[ -s "${NVM_DIR:-$HOME/.nvm}/nvm.sh" ]]; then
+    echo "SETUP_ATTEMPT: NVM"
     # shellcheck disable=SC1090
     . "${NVM_DIR:-$HOME/.nvm}/nvm.sh"
-    nvm install --lts >/dev/null
-    nvm use --lts >/dev/null
-  else
-    echo "SETUP_FAILED: node is unavailable and nvm is unavailable; provision Node >=18 in the sandbox" >&2
-    exit 127
+    if nvm install --lts >/dev/null && nvm use --lts >/dev/null && node_usable; then return 0; fi
+    echo "SETUP_ATTEMPT_FAILED: NVM could not provide Node >=18/npm" >&2
   fi
-fi
+  if command -v fnm >/dev/null 2>&1; then
+    echo "SETUP_ATTEMPT: fnm"
+    if fnm install --lts >/dev/null && fnm use --lts >/dev/null && node_usable; then return 0; fi
+    echo "SETUP_ATTEMPT_FAILED: fnm could not provide Node >=18/npm" >&2
+  fi
 
-command -v npm >/dev/null 2>&1 || { echo "SETUP_FAILED: npm is unavailable after Node setup" >&2; exit 127; }
-node_major="$(node -p 'process.versions.node.split(".")[0]')"
-(( node_major >= 18 )) || { echo "SETUP_FAILED: Node >=18 required (found $(node --version))" >&2; exit 1; }
+  # Self-contained fallback: download the official Node binary into the
+  # sandbox skill directory; no global or host installation is required.
+  local version="${AEGIS_NODE_VERSION:-22.22.1}" os arch archive_url runtime_dir tmp_archive
+  os="$(uname -s | tr '[:upper:]' '[:lower:]')"
+  case "$(uname -m)" in
+    x86_64|amd64) arch=x64 ;;
+    aarch64|arm64) arch=arm64 ;;
+    *) echo "SETUP_ATTEMPT: unsupported architecture $(uname -m) for Node binary" >&2 ; arch="" ;;
+  esac
+  if [[ "$os" == linux && -n "$arch" ]] && { command -v curl >/dev/null 2>&1 || command -v wget >/dev/null 2>&1; }; then
+    runtime_dir="$skill_dir/.runtime/node-v$version-linux-$arch"
+    if [[ ! -x "$runtime_dir/bin/node" ]]; then
+      tmp_archive="${TMPDIR:-/tmp}/aegis-node-$version-$arch.tar.xz"
+      archive_url="https://nodejs.org/dist/v$version/node-v$version-linux-$arch.tar.xz"
+      echo "SETUP_ATTEMPT: official Node binary $archive_url"
+      if command -v curl >/dev/null 2>&1; then
+        curl -fsSL "$archive_url" -o "$tmp_archive" || echo "SETUP_ATTEMPT_FAILED: download failed ($archive_url)" >&2
+      else
+        wget -q "$archive_url" -O "$tmp_archive" || echo "SETUP_ATTEMPT_FAILED: download failed ($archive_url)" >&2
+      fi
+      if [[ -s "$tmp_archive" ]]; then
+        mkdir -p "$skill_dir/.runtime"
+        tar -xJf "$tmp_archive" -C "$skill_dir/.runtime" || echo "SETUP_ATTEMPT_FAILED: could not extract $tmp_archive" >&2
+      fi
+    fi
+    if [[ -x "$runtime_dir/bin/node" && -x "$runtime_dir/bin/npm" ]]; then
+      export PATH="$runtime_dir/bin:$PATH"
+      node_usable && return 0
+    fi
+  fi
+
+  # Last resort for Debian-like sandboxes where apt is available and we are
+  # root. Validate the resulting major version; distro packages may be old.
+  if command -v apt-get >/dev/null 2>&1 && [[ "$(id -u)" == 0 ]]; then
+    apt-get update -qq >/dev/null 2>&1 && apt-get install -y -qq nodejs npm >/dev/null 2>&1 || true
+    node_usable && return 0
+  fi
+  return 1
+}
+
+if ! node_usable; then
+  provision_node || {
+    echo "SETUP_FAILED: Node >=18/npm unavailable after NVM, fnm, official binary, and apt fallbacks" >&2
+    exit 127
+  }
+fi
+node_usable || { echo "SETUP_FAILED: Node >=18 and npm are required (found ${node:-unavailable})" >&2; exit 1; }
 
 # NVM activation is process-local. Persist the resolved binary directory so
 # BASELINE/CANDIDATE fresh shells can source it before invoking node/npm.

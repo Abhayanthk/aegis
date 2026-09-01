@@ -95,15 +95,18 @@ outside the sandbox. Never put secrets in the sandbox.
 2. Start the Repository Analyst and the Profiler preparation lanes in parallel.
 3. The Profiler runs one idempotent environment-preparation phase for the
    isolated sandbox. In that phase, detect Node/npm, provision Node.js >=18
-   only when absent, validate the lockfile-selected package manager, provision
-   its repository-pinned version (using Corepack for pnpm/Yarn), install the
+   only when absent or below version 18, using this exact fallback order:
+   existing runtime, NVM, fnm, official Node binary in the sandbox, then apt;
+   validate the lockfile-selected package manager, provision its
+   repository-pinned version (using Corepack for pnpm/Yarn), install the
    AEGIS harness dependencies, and install the target repository dependencies
    from the manager in the Analyst artifact. Group all missing setup
    work into this single phase. Reuse the
    prepared runtime and installed dependency trees for every later phase;
    never reinstall, refresh, or repeat a successful install. Never ask the
    user to approve this sandbox-only setup. If setup fails, report the exact
-   error and stop; include the exact failed prerequisite or command. The Root
+   error and stop; include every failed fallback and the exact failed command.
+   The Root
    Agent must never edit, normalize, or otherwise rewrite the Analyst artifact.
    Only after
    this lane succeeds may the BASELINE profiler
