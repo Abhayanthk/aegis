@@ -3,7 +3,7 @@
 This playbook is only for PREPARE. The task prompt must provide an absolute
 repository path and an absolute Analyst-report artifact path. Wait for that
 artifact, read `repository_context.package_manager`, and run the grouped setup
-script once. Poll for at most 120 seconds; if the artifact is still absent,
+script once. Poll for at most 300 seconds; if the artifact is still absent,
 return `SETUP_FAILED: Analyst report artifact not available` and stop. Do not
 infer or invent the manager:
 
