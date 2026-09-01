@@ -71,6 +71,8 @@ Return your findings as structured JSON:
     "framework": "express",
     "entry_point": "src/server.js",
     "package_manager": "npm",
+    "package_manager_status": "supported",
+    "package_manager_blocker": null,
     "test_directory": "test/",
     "test_command": "npm test",
     "test_command_source": "package_script|test_config|none",
@@ -95,8 +97,14 @@ Return your findings as structured JSON:
    configuration. Return the exact runnable command and its source. If no real
    suite exists, set both `test_directory` and `test_command` to `null` and set
    `test_command_source` to `none`; never invent a test command.
-8. **Identify the package manager.** Infer it from the lockfile or repository
-   metadata and report `npm`, `pnpm`, `yarn`, `bun`, or `unknown`.
+8. **Identify the package manager.** A runnable manager requires its matching
+   lockfile: `package-lock.json`, `pnpm-lock.yaml`, or `yarn.lock`. Report only
+   `npm`, `pnpm`, `yarn`, or `unknown` in `package_manager`. Include
+   `package_manager_status` as `supported` for a manager with its lockfile,
+   `unsupported:bun` when Bun is detected, or `unresolved` when metadata names
+   a manager but its lockfile is missing (or no manager can be determined).
+   Put the exact reason in `package_manager_blocker`. Never report a manager as
+   runnable based on metadata alone.
 9. **Flag artificial blockers.** If you identify artificial busy-waits or
    useless CPU-spinning (e.g. `Math.sqrt(Math.random())`), report them with
    `pattern: artificial_delay` so the Repairer and Root Agent know deletion

@@ -46,8 +46,12 @@ At the start, launch these independent lanes in parallel:
 1. **Repository Analyst:** inspect the repository without running application
    code; return suspects, entry point, health endpoint, package manager, and
    actual test command.
-2. **Profiler preparation:** inspect only the AEGIS harness dependency state
-   and wait for the Analyst's endpoint details before creating the config.
+2. **Profiler preparation:** receive the absolute repository path and the
+   absolute Analyst-report artifact path explicitly. It may preflight Node while
+   ANALYZE runs, but must wait for and read that artifact before dependency
+   setup. This lane
+   must not inspect application behavior, create experiment config, start the
+   target, run tests, run experiments, or interpret results.
 
 The baseline run waits for the Analyst's result. Candidate measurement waits for
 the Repairer. Never run two load experiments concurrently. If the runtime has no
@@ -82,13 +86,22 @@ outside the sandbox. Never put secrets in the sandbox.
 
 ### Required startup checklist
 
-1. Resolve the skill directory and playbook paths to absolute paths.
+1. Resolve the skill directory, repository path, and Analyst-report artifact
+   paths to absolute paths.
 2. Start the Repository Analyst and the Profiler preparation lanes in parallel.
-3. The Profiler runs the environment preflight and automatically prepares the
-   isolated sandbox: install a supported Node.js runtime when needed, then
-   install harness dependencies using their lockfiles. Target dependencies
-   will be installed during the Baseline phase. Never ask the user to approve
-   this sandbox-only setup. If setup fails, report the exact error and stop.
+3. The Profiler runs one idempotent environment-preparation phase for the
+   isolated sandbox. In that phase, detect Node/npm, provision Node.js >=18
+   only when absent, validate the lockfile-selected package manager, provision
+   its repository-pinned version (using Corepack for pnpm/Yarn), install the
+   AEGIS harness dependencies, and install the target repository dependencies
+   from the manager in the Analyst artifact. Group all missing setup
+   work into this single phase. Reuse the
+   prepared runtime and installed dependency trees for every later phase;
+   never reinstall, refresh, or repeat a successful install. Never ask the
+   user to approve this sandbox-only setup. If setup fails, report the exact
+   error and stop; include the exact failed prerequisite or command. Only after
+   this lane succeeds may the BASELINE profiler
+   create the experiment config, run the target, and run tests.
 4. Wait for BOTH subagents to complete. DO NOT analyze the repository yourself. Extract the Analyst's structured JSON report verbatim. Then delegate to the Profiler (Baseline phase) and pass the raw JSON into its prompt so it can create the experiment config.
 5. Run one baseline. Only after the baseline succeeds, present the required
    evidence and wait for explicit human approval before any target-code edit.
@@ -106,7 +119,8 @@ IDLE
  │               Read repo, find entry points, and identify suspect bottlenecks.
  │
  └─► PREPARE ──→ Delegate to Runtime Profiler (Preparation phase)
-                 Set up sandbox, install Node/npm, and install harness dependencies.
+                 Set up sandbox and perform the one grouped runtime, harness,
+                 and target-dependency installation.
                  Do not run experiments. MUST succeed before proceeding.
 
  (Wait for BOTH ANALYZE and PREPARE to complete)
@@ -170,7 +184,9 @@ playbook before delegating that role. Do not load all playbooks into every role.
 | Subagent             | Playbook                                     |
 |----------------------|----------------------------------------------|
 | Repository Analyst   | `references/analyst-playbook.md`             |
-| Runtime Profiler     | `references/profiler-playbook.md`            |
+| Runtime Profiler PREPARE | `references/preparation-playbook.md`       |
+| Runtime Profiler BASELINE | `references/baseline-playbook.md`        |
+| Runtime Profiler CANDIDATE | `references/candidate-playbook.md`      |
 | Performance Repairer | `references/repairer-playbook.md`            |
 
 Evidence and verification contracts are root-agent-only references (not loaded
@@ -195,37 +211,47 @@ You are the Repository Analyst for the ANALYZE phase. Before any work, read
 
 You have zero memory of the prior conversation.
 Repository Path: <ABSOLUTE PATH TO REPO>
+Analyst Report Artifact: <ABSOLUTE PATH TO analyst-report.json>
 
-Perform static analysis only: do not execute repository code. Return only the
-JSON contract required by that playbook, including package_manager and the actual
-test_command (or null when none exists). If the playbook cannot be read, stop and
-report that blocker.
+Perform static analysis only: do not execute repository code. Write the complete
+JSON contract to the supplied Analyst Report Artifact, including
+package_manager and the actual test_command (or null when none exists), then
+return the same JSON. If the playbook cannot be read, stop and report that
+blocker.
 ```
 
 **Runtime Profiler preparation**
 
 ```text
-You are the Runtime Profiler in the preparation phase. Before any work, read
-{skill_dir}/references/profiler-playbook.md in full. Run only the documented
-Node/npm preflight and automatic sandbox setup. You may provision Node >=18 and
-install local harness dependencies inside the sandbox; do not modify
-the host or install global packages. Do not run the target application or create
-an experiment config. Return the required preparation phase JSON result. If setup
-fails, report the error without asking the user.
+You are the Runtime Profiler in the PREPARE phase. Before any work, read
+{skill_dir}/references/preparation-playbook.md in full. Your only job is to install
+and validate the runtime and dependency trees. Do not inspect application code,
+create an experiment config, start the target app, run tests, run an experiment,
+or interpret metrics. You have:
+Repository Path: <ABSOLUTE PATH TO REPO>
+Analyst Report Artifact: <ABSOLUTE PATH TO analyst-report.json>
+Wait until that artifact exists, read its package_manager, then run exactly:
+`{skill_dir}/scripts/prepare_sandbox.sh <repository-path> <package-manager>`.
+Do not run separate install commands before or after it. Do not run the target
+application or create an experiment config. Return only the required
+preparation-phase JSON result. If setup fails, report the exact error without
+asking the user.
 ```
 
 **Runtime Profiler baseline**
 
 ```text
 You are the Runtime Profiler for the BASELINE phase. Before any work, read
-{skill_dir}/references/profiler-playbook.md in full.
+{skill_dir}/references/baseline-playbook.md in full.
 
 You have zero memory of the prior conversation. You must use:
 Analyst Report: <INSERT RAW JSON OR ABSOLUTE PATH TO FILE>
 Repository Path: <ABSOLUTE PATH TO REPO>
 
 CREATE the experiment config and write it to: <ABSOLUTE PATH>/experiment-config.json
-Install the target repository dependencies using the package manager from the Analyst Report.
+Use the dependency trees prepared by the grouped setup phase. Do not run an
+install command in BASELINE; if the preparation marker is missing or invalid,
+stop and report that setup failure.
 Then run the baseline experiment. Return the baseline phase JSON result. Do not interpret
 the verdict, alter target code, or replace a missing test command with a no-op.
 If the playbook cannot be read, stop and report that blocker.
@@ -235,7 +261,7 @@ If the playbook cannot be read, stop and report that blocker.
 
 ```text
 You are the Runtime Profiler for the CANDIDATE phase. Before any work, read
-{skill_dir}/references/profiler-playbook.md in full.
+{skill_dir}/references/candidate-playbook.md in full.
 
 You have zero memory of the prior conversation. You must use:
 Analyst Report: <INSERT RAW JSON OR ABSOLUTE PATH TO FILE>
