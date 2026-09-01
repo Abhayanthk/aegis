@@ -26,6 +26,8 @@ export function StageContent(props: StageContentProps) {
     onRetry,
     onReject,
     onResume,
+  canAdvance,
+  getStageStatus,
   } = props;
   // Handle global investigation states
   if (investigationStatus === "paused" || investigationStatus === "pausing") {
@@ -59,23 +61,26 @@ export function StageContent(props: StageContentProps) {
           transition={{ duration: 0.25, ease: [0.25, 0.1, 0.25, 1] }}
         >
           {(activeStage === "repo_context" || activeStage === "discover") && (
-            <RepoInfoStage data={data} onStageSelect={onStageSelect} />
+            <RepoInfoStage data={data} onStageSelect={onStageSelect} canAdvance={canAdvance} />
           )}
           {activeStage === "repo_analyzer" && (
             <RepoAnalyzerStage
               data={data}
               onStageSelect={onStageSelect}
               investigationStatus={investigationStatus}
+              canAdvance={canAdvance}
+              stageStatus={getStageStatus?.("repo_analyzer")}
             />
           )}
           {(activeStage === "endpoint_finder" || activeStage === "reproduce") && (
-            <EndpointFinderStage data={data} onStageSelect={onStageSelect} />
+            <EndpointFinderStage data={data} onStageSelect={onStageSelect} canAdvance={canAdvance} />
           )}
           {(activeStage === "baseline_test" || activeStage === "measure") && (
             <BaselineStage
               data={data}
               onStageSelect={onStageSelect}
               investigationStatus={investigationStatus}
+              canAdvance={canAdvance}
             />
           )}
           {(activeStage === "repair" || activeStage === "diagnose") && (
@@ -83,6 +88,7 @@ export function StageContent(props: StageContentProps) {
               data={data}
               onStageSelect={onStageSelect}
               investigationStatus={investigationStatus}
+              canAdvance={canAdvance}
             />
           )}
           {activeStage === "candidate_test" && (
@@ -90,6 +96,7 @@ export function StageContent(props: StageContentProps) {
               data={data}
               onStageSelect={onStageSelect}
               investigationStatus={investigationStatus}
+              canAdvance={canAdvance}
             />
           )}
           {(activeStage === "verification" || activeStage === "validation") && (
@@ -99,6 +106,7 @@ export function StageContent(props: StageContentProps) {
               repairAttempt={repairAttempt}
               maxAttempts={maxAttempts}
               investigationStatus={investigationStatus}
+              canAdvance={canAdvance}
             />
           )}
           {(activeStage === "human_gate" || activeStage === "verify") && (
@@ -109,6 +117,7 @@ export function StageContent(props: StageContentProps) {
               maxAttempts={maxAttempts}
               onRetry={onRetry}
               onReject={onReject}
+              canAdvance={canAdvance}
             />
           )}
           {(activeStage === "pull_request" || activeStage === "approval") && (
@@ -116,6 +125,7 @@ export function StageContent(props: StageContentProps) {
               data={data}
               onStageSelect={onStageSelect}
               investigationStatus={investigationStatus}
+              canAdvance={canAdvance}
             />
           )}
         </motion.div>

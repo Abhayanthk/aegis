@@ -9,15 +9,17 @@ import type { InvestigationStatus } from "@/app/(investigation)/_components/inve
 export function VerificationStage({
   data,
   onStageSelect,
-  repairAttempt,
-  maxAttempts,
+  repairAttempt = 1,
+  maxAttempts = 3,
   investigationStatus = "completed",
+  canAdvance,
 }: {
   data: any;
   onStageSelect: (id: string) => void;
   repairAttempt: number;
   maxAttempts: number;
   investigationStatus?: InvestigationStatus;
+  canAdvance?: boolean;
 }) {
   const { baseline, verification, target, sandbox, reproduction, configuration } = data;
   const bm = baseline?.metrics;
@@ -256,7 +258,7 @@ export function VerificationStage({
       <div className="pt-0">
         <Button
           onClick={() => onStageSelect("human_gate")}
-          disabled={isRunning}
+          disabled={isRunning || !canAdvance}
           className="h-9 px-5 text-[13px] font-medium bg-[var(--ds-primary)] text-[var(--ds-on-primary)] hover:bg-[var(--ds-primary-hover)] gap-2 border-0 shadow-sm disabled:opacity-50"
         >
           Review decision <ArrowRight className="h-3.5 w-3.5" />

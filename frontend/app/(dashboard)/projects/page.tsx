@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { ProjectGrid } from "../_components/projects/project-grid";
 import Link from "next/link";
 import { Search, Plus } from "lucide-react";
@@ -18,13 +18,35 @@ import projectData from "@/data/Project.json";
 import type { Project } from "../_components/projects/project-card";
 
 export default function ProjectsPage() {
-  const { projects } = projectData;
-  const typedProjects = projects as unknown as Project[];
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
 
+  useEffect(() => {
+    fetch("/api/projects")
+      .then(res => res.json())
+      .then(data => {
+        const mappedProjects = (data.projects || []).map((p: any) => ({
+          ...p,
+          repository: p.repo_url,
+          latestInvestigation: p.latestInvestigation ? {
+            ...p.latestInvestigation,
+            time: new Date(p.latestInvestigation.time).toLocaleString(),
+            finding: p.latestInvestigation.finding || "Analysis complete"
+          } : null
+        }));
+        setProjects(mappedProjects);
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error("Failed to load projects", err);
+        setLoading(false);
+      });
+  }, []);
+
   const filteredProjects = useMemo(() => {
-    return typedProjects.filter(project => {
+    return projects.filter(project => {
       const matchesSearch = searchQuery.trim() === "" || 
         project.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
         project.repository.toLowerCase().includes(searchQuery.toLowerCase());
@@ -33,7 +55,7 @@ export default function ProjectsPage() {
       
       return matchesSearch && matchesStatus;
     });
-  }, [typedProjects, searchQuery, statusFilter]);
+  }, [projects, searchQuery, statusFilter]);
 
   return (
     <div className="flex flex-col flex-1 pb-12">
@@ -76,7 +98,11 @@ export default function ProjectsPage() {
       </div>
 
       <div className="p-6 mx-auto w-full max-w-screen-2xl">
-        <ProjectGrid projects={filteredProjects} />
+        {loading ? (
+           <div className="text-[13px] text-[var(--ds-ink-subtle)] px-4">Loading projects...</div>
+        ) : (
+          <ProjectGrid projects={filteredProjects} />
+        )}
       </div>
     </div>
   );

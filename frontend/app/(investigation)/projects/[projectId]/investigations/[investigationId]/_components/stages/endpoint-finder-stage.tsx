@@ -5,7 +5,7 @@ import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-export function EndpointFinderStage({ data, onStageSelect }: { data: any; onStageSelect: (id: string) => void }) {
+export function EndpointFinderStage({ data, onStageSelect, canAdvance }: { data: any; onStageSelect: (id: string) => void; canAdvance?: boolean; }) {
   const target = data?.target;
   const discovery = data?.discovery;
   const diagnosis = data?.diagnosis;

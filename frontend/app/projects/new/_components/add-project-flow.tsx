@@ -20,6 +20,7 @@ const GithubIcon = ({ className }: { className?: string }) => (
 );
 
 const MOCK_REPOS = [
+  { name: "nodetest", fullName: "Abhayanthk/nodetest", date: "Aug 30" },
   { name: "stage", fullName: "aryanpatel99/stage", date: "Aug 23" },
   { name: "ci-cd-test", fullName: "aryanpatel99/ci-cd-test", date: "Aug 21" },
   { name: "TIL", fullName: "aryanpatel99/TIL", date: "Aug 20" },
@@ -30,8 +31,6 @@ const MOCK_REPOS = [
 export function AddProjectFlow() {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
-
-  // Track which repo is currently importing
   const [importingRepo, setImportingRepo] = useState<string | null>(null);
 
   const filteredRepos = MOCK_REPOS.filter(
@@ -40,13 +39,31 @@ export function AddProjectFlow() {
       repo.fullName.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const handleImport = async (repoName: string) => {
-    setImportingRepo(repoName);
-    // Simulate network request
-    await new Promise((resolve) => setTimeout(resolve, 1500));
+  const handleImport = async (repoName: string, fullName: string) => {
+    setImportingRepo(fullName);
+    try {
+      // 1. Create the project
+      const projectRes = await fetch("/api/projects", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: repoName, repoUrl: `https://github.com/${fullName}` }),
+      });
+      const project = await projectRes.json();
 
-    // Redirect after "importing"
-    router.push("/projects");
+      // 2. Create the investigation
+      const invRes = await fetch(`/api/projects/${project.id}/investigations`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "pending" }),
+      });
+      const investigation = await invRes.json();
+
+      // 3. Redirect
+      router.push(`/projects/${project.id}/investigations/${investigation.id}`);
+    } catch (err) {
+      console.error("Import failed:", err);
+      setImportingRepo(null);
+    }
   };
 
   return (
@@ -100,7 +117,7 @@ export function AddProjectFlow() {
 
               <Button
                 size="sm"
-                onClick={() => handleImport(repo.fullName)}
+                onClick={() => handleImport(repo.name, repo.fullName)}
                 disabled={importingRepo === repo.fullName}
                 className="h-8 px-4 text-[13px] font-medium bg-[var(--ds-primary)] text-[var(--ds-on-primary)] hover:bg-[var(--ds-primary-hover)] border-0"
               >
