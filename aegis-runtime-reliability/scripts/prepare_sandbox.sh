@@ -35,6 +35,7 @@ provision_node() {
   # Self-contained fallback: download the official Node binary into the
   # sandbox skill directory; no global or host installation is required.
   local version="${AEGIS_NODE_VERSION:-22.22.1}" os arch archive_url runtime_dir tmp_archive
+  local tmp_root tmp_runtime sums_sig sums_txt keyring verify_log archive_name expected actual
   os="$(uname -s | tr '[:upper:]' '[:lower:]')"
   case "$(uname -m)" in
     x86_64|amd64) arch=x64 ;;
@@ -43,21 +44,71 @@ provision_node() {
   esac
   if [[ "$os" == linux && -n "$arch" ]] && { command -v curl >/dev/null 2>&1 || command -v wget >/dev/null 2>&1; }; then
     runtime_dir="$skill_dir/.runtime/node-v$version-linux-$arch"
-    if [[ ! -x "$runtime_dir/bin/node" ]]; then
-      tmp_archive="${TMPDIR:-/tmp}/aegis-node-$version-$arch.tar.xz"
-      archive_url="https://nodejs.org/dist/v$version/node-v$version-linux-$arch.tar.xz"
+    runtime_usable() {
+      [[ -x "$1/bin/node" && -x "$1/bin/npm" ]] || return 1
+      local major
+      major="$("$1/bin/node" -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo 0)"
+      (( major >= 18 ))
+    }
+    if ! runtime_usable "$runtime_dir"; then
+      # Remove incomplete remnants so a prior interrupted extraction cannot
+      # suppress recovery on the next attempt.
+      rm -rf "$runtime_dir" "$runtime_dir.tmp"
+      # Use gzip rather than xz so extraction works in minimal sandboxes.
+      tmp_archive="${TMPDIR:-/tmp}/aegis-node-$version-$arch.tar.gz"
+      archive_url="https://nodejs.org/dist/v$version/node-v$version-linux-$arch.tar.gz"
+      sums_sig="${TMPDIR:-/tmp}/aegis-node-$version-SHASUMS256.txt.asc"
+      sums_txt="${TMPDIR:-/tmp}/aegis-node-$version-SHASUMS256.txt"
+      keyring="$skill_dir/.runtime/nodejs-release-keyring.kbx"
+      archive_name="$(basename "$archive_url")"
       echo "SETUP_ATTEMPT: official Node binary $archive_url"
       if command -v curl >/dev/null 2>&1; then
         curl -fsSL "$archive_url" -o "$tmp_archive" || echo "SETUP_ATTEMPT_FAILED: download failed ($archive_url)" >&2
+        curl -fsSL "https://nodejs.org/dist/v$version/SHASUMS256.txt.asc" -o "$sums_sig" || echo "SETUP_ATTEMPT_FAILED: checksum signature download failed (v$version)" >&2
+        curl -fsSL "https://github.com/nodejs/release-keys/raw/HEAD/gpg/pubring.kbx" -o "$keyring" || echo "SETUP_ATTEMPT_FAILED: Node release keyring download failed" >&2
       else
         wget -q "$archive_url" -O "$tmp_archive" || echo "SETUP_ATTEMPT_FAILED: download failed ($archive_url)" >&2
+        wget -q "https://nodejs.org/dist/v$version/SHASUMS256.txt.asc" -O "$sums_sig" || echo "SETUP_ATTEMPT_FAILED: checksum signature download failed (v$version)" >&2
+        wget -q "https://github.com/nodejs/release-keys/raw/HEAD/gpg/pubring.kbx" -O "$keyring" || echo "SETUP_ATTEMPT_FAILED: Node release keyring download failed" >&2
       fi
-      if [[ -s "$tmp_archive" ]]; then
-        mkdir -p "$skill_dir/.runtime"
-        tar -xJf "$tmp_archive" -C "$skill_dir/.runtime" || echo "SETUP_ATTEMPT_FAILED: could not extract $tmp_archive" >&2
+      if [[ -s "$tmp_archive" && -s "$sums_sig" && -s "$keyring" ]] && command -v gpgv >/dev/null 2>&1; then
+        verify_log="${TMPDIR:-/tmp}/aegis-node-gpgv-$version.log"
+        if ! gpgv --keyring="$keyring" --output "$sums_txt" "$sums_sig" >"$verify_log" 2>&1; then
+          echo "SETUP_ATTEMPT_FAILED: gpgv signature verification failed; output:" >&2
+          cat "$verify_log" >&2
+        else
+          expected="$(awk -v f="$archive_name" '$2 == f {print $1}' "$sums_txt")"
+          if [[ -z "$expected" ]]; then
+            echo "SETUP_ATTEMPT_FAILED: signed checksum has no entry for $archive_name" >&2
+          else
+            actual="$(shasum -a 256 "$tmp_archive" | awk '{print $1}')"
+            if [[ "$actual" != "$expected" ]]; then
+              echo "SETUP_ATTEMPT_FAILED: SHA-256 mismatch for $archive_name (expected $expected, got $actual)" >&2
+            else
+              tmp_root="$skill_dir/.runtime/.node-extract.$$"
+              rm -rf "$tmp_root"
+              mkdir -p "$tmp_root"
+              if tar -xzf "$tmp_archive" -C "$tmp_root"; then
+                tmp_runtime="$tmp_root/node-v$version-linux-$arch"
+                if runtime_usable "$tmp_runtime"; then
+                  rm -rf "$runtime_dir"
+                  mv "$tmp_runtime" "$runtime_dir"
+                else
+                  echo "SETUP_ATTEMPT_FAILED: extracted Node runtime failed validation" >&2
+                fi
+              else
+                echo "SETUP_ATTEMPT_FAILED: could not extract $tmp_archive" >&2
+              fi
+              rm -rf "$tmp_root"
+            fi
+          fi
+        fi
+      else
+        echo "SETUP_ATTEMPT_FAILED: secure Node verification requires downloaded archive, SHASUMS256.txt.asc, trusted keyring, and gpgv" >&2
       fi
     fi
-    if [[ -x "$runtime_dir/bin/node" && -x "$runtime_dir/bin/npm" ]]; then
+    rm -f "$tmp_archive" "$sums_sig" "$sums_txt" "${verify_log:-}"
+    if runtime_usable "$runtime_dir"; then
       export PATH="$runtime_dir/bin:$PATH"
       node_usable && return 0
     fi
@@ -66,8 +117,24 @@ provision_node() {
   # Last resort for Debian-like sandboxes where apt is available and we are
   # root. Validate the resulting major version; distro packages may be old.
   if command -v apt-get >/dev/null 2>&1 && [[ "$(id -u)" == 0 ]]; then
-    apt-get update -qq >/dev/null 2>&1 && apt-get install -y -qq nodejs npm >/dev/null 2>&1 || true
-    node_usable && return 0
+    local apt_log="${TMPDIR:-/tmp}/aegis-apt-node.log"
+    echo "SETUP_ATTEMPT: apt-get update && apt-get install -y nodejs npm"
+    : > "$apt_log"
+    if apt-get update -qq >"$apt_log" 2>&1; then
+      if apt-get install -y -qq nodejs npm >>"$apt_log" 2>&1; then
+        if node_usable; then return 0; fi
+        echo "SETUP_ATTEMPT_FAILED: apt installed Node/npm but Node >=18 validation failed" >&2
+        cat "$apt_log" >&2
+      else
+        apt_status=$?
+        echo "SETUP_ATTEMPT_FAILED: apt-get install -y nodejs npm (exit $apt_status)" >&2
+        cat "$apt_log" >&2
+      fi
+    else
+      apt_status=$?
+      echo "SETUP_ATTEMPT_FAILED: apt-get update (exit $apt_status)" >&2
+      cat "$apt_log" >&2
+    fi
   fi
   return 1
 }

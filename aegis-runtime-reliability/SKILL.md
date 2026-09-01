@@ -105,7 +105,9 @@ outside the sandbox. Never put secrets in the sandbox.
    prepared runtime and installed dependency trees for every later phase;
    never reinstall, refresh, or repeat a successful install. Never ask the
    user to approve this sandbox-only setup. If setup fails, report the exact
-   error and stop; include every failed fallback and the exact failed command.
+   error and stop; include every failed fallback, exact failed command, exit
+   status, and captured stderr/stdout. Never replace those diagnostics with a
+   generic message.
    The Root
    Agent must never edit, normalize, or otherwise rewrite the Analyst artifact.
    Only after
