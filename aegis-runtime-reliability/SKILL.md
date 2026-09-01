@@ -119,8 +119,9 @@ outside the sandbox. Never put secrets in the sandbox.
    the absolute artifact paths into its prompt so it can create the experiment
    config. Do not append guessed endpoints, commands, or other commentary to
    the phase prompt.
-5. Run one baseline. Only after the baseline succeeds, present the required
-   evidence and wait for explicit human approval before any target-code edit.
+5. Run one baseline. If it succeeds, proceed automatically through diagnosis,
+   repair, and the candidate experiment. Do not ask for approval before editing
+   target code; the candidate-result review is the first human checkpoint.
 
 ---
 
@@ -152,40 +153,43 @@ BASELINE ──→ Delegate to Runtime Profiler (Baseline phase)
 DIAGNOSE ──→ Interpret baseline metrics to confirm the server is suffering from starvation.
  │           Instruct the Repairer to apply Batched Fixes for ALL suspect bottlenecks found by the Analyst.
  ▼
-REPAIR REVIEW ──→ Present the proposed code change and ask to apply it
- │                Use the `ask_question` tool to get explicit human approval before any code edit
- ▼
 REPAIR ──→ Delegate to Performance Repairer (max 3 attempts)
  │         Use Analyst output and Baseline metrics to apply the best repair pattern.
  │         Generate minimal code diff.
  ▼
-CANDIDATE ──→ Delegate to Runtime Profiler (Candidate phase)
+ CANDIDATE ──→ Delegate to Runtime Profiler (Candidate phase)
  │            Re-run the exact same experiment against the edited code.
  │            verify.mjs compares candidate vs baseline.
  │          │
- │          ├─ VERIFIED → Proceed to PR REVIEW
- │          ├─ FAILED   → Loop back to REPAIR (max 3 attempts). If 3 attempts fail, ESCALATE.
+ │          ├─ VERIFIED or FAILED → Proceed to CANDIDATE REVIEW
  │          ├─ RETRY    → Re-run experiment (transient issue)
  │          ├─ INCOMPARABLE → Fix protocol mismatch, re-run
  │          └─ ESCALATE → Stop, report evidence to human
  ▼
+ CANDIDATE REVIEW ──→ Present the candidate evidence and verifier verdict.
+                      Ask exactly: "Do you accept the candidate result, retry the repair, or reject?"
+                      ACCEPT → PR REVIEW; RETRY → REPAIR (within the attempt limit);
+                      REJECT → Stop.
+ ▼
 PR REVIEW ──→ Present all findings to the user (Root Agent)
               Show the Analyst bottlenecks, Baseline metrics, code diff, and Candidate metrics.
-              Use the `ask_question` tool to ask exactly: "Do you want to raise a PR, retry the repair, or reject?"
+              Use the `ask_question` tool to ask exactly: "Do you want to raise a PR?"
 ```
 
 
-### Repair approval gate
+### Candidate result review gate
 
-After automatic diagnosis and before a target-code edit, present the root cause,
-the exact files/functions to change, and the expected behavior preserved by the
-repair. You MUST propose fixing ALL bottlenecks identified by the Analyst (Batched Fixes). You MUST use the `ask_question` tool to ask for approval to apply these repairs and run the candidate experiment. Do not edit code before approval.
+After automatic diagnosis, instruct the Repairer to fix ALL bottlenecks identified
+by the Analyst (Batched Fixes) and run the candidate experiment automatically.
+After the candidate verifier returns, present the raw verdict and evidence and
+use `ask_question` to ask exactly: "Do you accept the candidate result, retry the
+repair, or reject?" Do not ask for approval before the repair.
 
 ### Pull request approval gate
 
 Only after `verify.mjs` returns `VERIFIED` (or the user accepts a failed but improved candidate), present the baseline and candidate values side by side with the verifier's raw verdict. You MUST use the `ask_question` tool to ask whether to create the branch, commit, and pull request. Do not make GitHub writes before approval.
 
-**CRITICAL RULE FOR QUESTIONS:** The Root Agent MUST NOT ask any questions other than the REPAIR REVIEW (accept/reject/retry) and the PR REVIEW (accept/reject). Do not ask for approval to provision the isolated sandbox, install project or
+**CRITICAL RULE FOR QUESTIONS:** The Root Agent MUST NOT ask any questions other than the CANDIDATE REVIEW (accept/retry/reject) and the PR REVIEW (raise a PR or not). Do not ask for approval to provision the isolated sandbox, install project or
 harness dependencies, choose a smoke check, or retry a bounded setup step. On a
 blocking setup or measurement failure, report the exact error and stop without
 turning it into an approval question.
@@ -297,7 +301,7 @@ cannot be read, stop and report that blocker.
 **Performance Repairer**
 
 ```text
-You are the Performance Repairer for an approved REPAIR phase. Before any work,
+You are the Performance Repairer for the REPAIR phase. Before any work,
 read {skill_dir}/references/repairer-playbook.md in full.
 
 You have zero memory of the prior conversation. You must act ONLY on the following evidence:
