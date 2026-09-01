@@ -89,13 +89,16 @@ outside the sandbox. Never put secrets in the sandbox.
 2. Start the Repository Analyst and the Profiler preparation lanes in parallel.
 3. The Profiler runs one idempotent environment-preparation phase for the
    isolated sandbox. In that phase, detect Node/npm, provision Node.js >=18
-   only when absent, install the AEGIS harness dependencies, and install the
-   target repository dependencies from its lockfile. Group all missing setup
+   only when absent, validate the lockfile-selected package manager, provision
+   its repository-pinned version (using Corepack for pnpm/Yarn), install the
+   AEGIS harness dependencies, and install the target repository dependencies
+   from its lockfile. Group all missing setup
    work into this single phase. Reuse the
    prepared runtime and installed dependency trees for every later phase;
    never reinstall, refresh, or repeat a successful install. Never ask the
    user to approve this sandbox-only setup. If setup fails, report the exact
-   error and stop. Only after this lane succeeds may the BASELINE profiler
+   error and stop; include the exact failed prerequisite or command. Only after
+   this lane succeeds may the BASELINE profiler
    create the experiment config, run the target, and run tests.
 4. Wait for BOTH subagents to complete. DO NOT analyze the repository yourself. Extract the Analyst's structured JSON report verbatim. Then delegate to the Profiler (Baseline phase) and pass the raw JSON into its prompt so it can create the experiment config.
 5. Run one baseline. Only after the baseline succeeds, present the required

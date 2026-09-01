@@ -11,5 +11,13 @@ not wait for Analyst output or request a package-manager value:
 Do not inspect source, create configs, start apps, run tests, experiments, or
 verification. Do not run any other install command.
 
-Return only `{"phase":"preparation","exit_code":0}` on success. On failure,
-return the exact error and stop.
+Return only this JSON on success:
+
+```json
+{
+  "phase": "preparation",
+  "exit_code": 0
+}
+```
+
+On failure, return the exact command error and stop.
