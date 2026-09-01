@@ -1,9 +1,13 @@
 # Runtime Profiler — BASELINE
 
 PREPARE must already have succeeded. In this fresh shell, source the durable
-runtime artifact first:
+runtime artifact from the repository working directory. The task prompt must
+provide absolute values for `<repository-path>`, `<skill-dir>`, and every
+artifact path. Always establish the repository working directory before any
+relative application command:
 
 ```bash
+cd <repository-path>
 source <skill-dir>/.aegis-node-env
 ```
 
@@ -54,14 +58,20 @@ meaningful repository-local smoke check. `true`, `:`, `exit 0`, empty, echo-only
 and printf-only commands are invalid and will be rejected.
 
 Do not invent endpoints, payloads, defaults, metrics, or pass/fail decisions.
-Then run:
+Then, still from `<repository-path>`, run the harness with absolute paths:
 
 ```bash
-node scripts/run_experiment.mjs --config experiment-config.json --output baseline/metrics.json
+node <skill-dir>/scripts/run_experiment.mjs \
+  --config <absolute experiment-config.json> \
+  --output <absolute baseline/metrics.json>
 ```
 
-Do not edit target code or interpret results. Return exactly this JSON shape,
-substituting the actual values and the complete raw metrics object:
+Do not edit target code or interpret results. If `run_experiment.mjs` exits
+non-zero, stop immediately. Do not invoke `verify.mjs`, synthesize metrics, or
+describe the run as a performance result. Return the exact command, exit code,
+stdout, and stderr as an execution blocker. No metrics file is valid unless the
+harness exits 0. On exit 0, return exactly this JSON shape, substituting the
+actual values and the complete raw metrics object:
 
 ```json
 {

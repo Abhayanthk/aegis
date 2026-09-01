@@ -113,7 +113,7 @@ Return your findings as structured JSON to the root agent:
 2. The Runtime Profiler re-runs the experiment with the SAME config.
 3. `verify.mjs` compares candidate metrics against baseline.
 4. The verdict comes back:
-   - **VERIFIED**: Your fix worked. Proceed to approval.
+   - **VERIFIED**: Your fix worked. Proceed to candidate-result review.
    - **FAILED**: Your fix didn't pass the gates. Review the `deltas` and
      `reasons` in the verdict to understand what's still failing, then
      try a different approach.

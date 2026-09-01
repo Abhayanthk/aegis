@@ -1,9 +1,13 @@
 # Runtime Profiler — CANDIDATE
 
 PREPARE and BASELINE must already have succeeded. In this fresh shell, source
-the durable runtime artifact before invoking Node:
+the durable runtime artifact from the repository working directory. The task
+prompt must provide absolute values for `<repository-path>`, `<skill-dir>`, and
+the Analyst, baseline, config, candidate, and verdict artifact paths. Always
+establish the repository working directory before invoking Node:
 
 ```bash
+cd <repository-path>
 source <skill-dir>/.aegis-node-env
 ```
 
@@ -14,8 +18,24 @@ edit target code.
 Run:
 
 ```bash
-node scripts/run_experiment.mjs --config <experiment-config.json> --output candidate/metrics.json
-node scripts/verify.mjs --baseline baseline/metrics.json --candidate candidate/metrics.json --policy config/verification-policy.json --output verdict.json
+node <skill-dir>/scripts/run_experiment.mjs \
+  --config <absolute experiment-config.json> \
+  --output <absolute candidate/metrics.json>
+```
+
+If `run_experiment.mjs` exits non-zero, stop immediately. Do not invoke
+`verify.mjs`, synthesize metrics or a verdict, or classify the failure as a
+performance `FAILED` result. Return the exact command, exit code, stdout, and
+stderr as an execution blocker.
+
+Only after `run_experiment.mjs` exits 0, still from `<repository-path>`, run:
+
+```bash
+node <skill-dir>/scripts/verify.mjs \
+  --baseline <absolute baseline/metrics.json> \
+  --candidate <absolute candidate/metrics.json> \
+  --policy <skill-dir>/config/verification-policy.json \
+  --output <absolute verdict.json>
 ```
 
 Return exactly this JSON shape, substituting the actual values and the complete
