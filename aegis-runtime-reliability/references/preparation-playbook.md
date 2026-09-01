@@ -1,11 +1,12 @@
 # Runtime Profiler — PREPARE
 
-This playbook is only for PREPARE. Once the repository path is known, run the
-grouped setup script once. It detects the package manager from lockfiles; do
-not wait for Analyst output or request a package-manager value:
+This playbook is only for PREPARE. The task prompt must provide an absolute
+repository path and an absolute Analyst-report artifact path. Wait for that
+artifact, read `repository_context.package_manager`, and run the grouped setup
+script once. Do not infer or invent the manager:
 
 ```bash
-<skill-dir>/scripts/prepare_sandbox.sh <repository-path>
+<skill-dir>/scripts/prepare_sandbox.sh <repository-path> <package-manager>
 ```
 
 Do not inspect source, create configs, start apps, run tests, experiments, or

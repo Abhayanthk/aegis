@@ -46,9 +46,10 @@ At the start, launch these independent lanes in parallel:
 1. **Repository Analyst:** inspect the repository without running application
    code; return suspects, entry point, health endpoint, package manager, and
    actual test command.
-2. **Profiler preparation:** perform only the single grouped runtime and
-   dependency setup using the repository path; the script detects the package
-   manager from lockfiles. This lane
+2. **Profiler preparation:** receive the absolute repository path and the
+   absolute Analyst-report artifact path explicitly. It may preflight Node while
+   ANALYZE runs, but must wait for and read that artifact before dependency
+   setup. This lane
    must not inspect application behavior, create experiment config, start the
    target, run tests, run experiments, or interpret results.
 
@@ -85,14 +86,15 @@ outside the sandbox. Never put secrets in the sandbox.
 
 ### Required startup checklist
 
-1. Resolve the skill directory and playbook paths to absolute paths.
+1. Resolve the skill directory, repository path, and Analyst-report artifact
+   paths to absolute paths.
 2. Start the Repository Analyst and the Profiler preparation lanes in parallel.
 3. The Profiler runs one idempotent environment-preparation phase for the
    isolated sandbox. In that phase, detect Node/npm, provision Node.js >=18
    only when absent, validate the lockfile-selected package manager, provision
    its repository-pinned version (using Corepack for pnpm/Yarn), install the
    AEGIS harness dependencies, and install the target repository dependencies
-   from its lockfile. Group all missing setup
+   from the manager in the Analyst artifact. Group all missing setup
    work into this single phase. Reuse the
    prepared runtime and installed dependency trees for every later phase;
    never reinstall, refresh, or repeat a successful install. Never ask the
@@ -209,11 +211,13 @@ You are the Repository Analyst for the ANALYZE phase. Before any work, read
 
 You have zero memory of the prior conversation.
 Repository Path: <ABSOLUTE PATH TO REPO>
+Analyst Report Artifact: <ABSOLUTE PATH TO analyst-report.json>
 
-Perform static analysis only: do not execute repository code. Return only the
-JSON contract required by that playbook, including package_manager and the actual
-test_command (or null when none exists). If the playbook cannot be read, stop and
-report that blocker.
+Perform static analysis only: do not execute repository code. Write the complete
+JSON contract to the supplied Analyst Report Artifact, including
+package_manager and the actual test_command (or null when none exists), then
+return the same JSON. If the playbook cannot be read, stop and report that
+blocker.
 ```
 
 **Runtime Profiler preparation**
@@ -223,8 +227,11 @@ You are the Runtime Profiler in the PREPARE phase. Before any work, read
 {skill_dir}/references/preparation-playbook.md in full. Your only job is to install
 and validate the runtime and dependency trees. Do not inspect application code,
 create an experiment config, start the target app, run tests, run an experiment,
-or interpret metrics. Once the repository path is known, run exactly:
-`{skill_dir}/scripts/prepare_sandbox.sh <repository-path>`.
+or interpret metrics. You have:
+Repository Path: <ABSOLUTE PATH TO REPO>
+Analyst Report Artifact: <ABSOLUTE PATH TO analyst-report.json>
+Wait until that artifact exists, read its package_manager, then run exactly:
+`{skill_dir}/scripts/prepare_sandbox.sh <repository-path> <package-manager>`.
 Do not run separate install commands before or after it. Do not run the target
 application or create an experiment config. Return only the required
 preparation-phase JSON result. If setup fails, report the exact error without
