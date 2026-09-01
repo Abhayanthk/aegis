@@ -47,7 +47,8 @@ At the start, launch these independent lanes in parallel:
    code; return suspects, entry point, health endpoint, package manager, and
    actual test command.
 2. **Profiler preparation:** perform only the single grouped runtime and
-   dependency setup after the Analyst supplies the package manager. This lane
+   dependency setup using the repository path; the script detects the package
+   manager from lockfiles. This lane
    must not inspect application behavior, create experiment config, start the
    target, run tests, run experiments, or interpret results.
 
@@ -89,8 +90,8 @@ outside the sandbox. Never put secrets in the sandbox.
 3. The Profiler runs one idempotent environment-preparation phase for the
    isolated sandbox. In that phase, detect Node/npm, provision Node.js >=18
    only when absent, install the AEGIS harness dependencies, and install the
-   target repository dependencies once the Analyst has identified the package
-   manager. Group all missing setup work into this single phase. Reuse the
+   target repository dependencies from its lockfile. Group all missing setup
+   work into this single phase. Reuse the
    prepared runtime and installed dependency trees for every later phase;
    never reinstall, refresh, or repeat a successful install. Never ask the
    user to approve this sandbox-only setup. If setup fails, report the exact
@@ -219,9 +220,8 @@ You are the Runtime Profiler in the PREPARE phase. Before any work, read
 {skill_dir}/references/preparation-playbook.md in full. Your only job is to install
 and validate the runtime and dependency trees. Do not inspect application code,
 create an experiment config, start the target app, run tests, run an experiment,
-or interpret metrics. After the Analyst report supplies the repository path and
-package manager, run exactly:
-`{skill_dir}/scripts/prepare_sandbox.sh <repository-path> <package-manager>`.
+or interpret metrics. Once the repository path is known, run exactly:
+`{skill_dir}/scripts/prepare_sandbox.sh <repository-path>`.
 Do not run separate install commands before or after it. Do not run the target
 application or create an experiment config. Return only the required
 preparation-phase JSON result. If setup fails, report the exact error without

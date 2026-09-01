@@ -2,10 +2,10 @@
 set -Eeuo pipefail
 
 # One-time, idempotent AEGIS setup. Run this before BASELINE.
-# Usage: prepare_sandbox.sh <repository> <npm|pnpm|yarn>
+# Usage: prepare_sandbox.sh <repository> [npm|pnpm|yarn]
 
 repo_dir="${1:?repository path required}"
-manager="${2:?package manager required}"
+manager="${2:-}"
 skill_dir="$(cd "$(dirname "$0")/.." && pwd)"
 marker="$skill_dir/.aegis-prepared"
 
@@ -41,6 +41,13 @@ install_if_needed() {
 }
 
 install_if_needed "$skill_dir/scripts" "$skill_dir/scripts/package-lock.json" npm ci
+if [[ -z "$manager" ]]; then
+  if [[ -f "$repo_dir/package-lock.json" ]]; then manager=npm
+  elif [[ -f "$repo_dir/pnpm-lock.yaml" ]]; then manager=pnpm
+  elif [[ -f "$repo_dir/yarn.lock" ]]; then manager=yarn
+  else echo "SETUP_FAILED: no supported package-manager lockfile found in $repo_dir" >&2; exit 2
+  fi
+fi
 case "$manager" in
   npm)  install_if_needed "$repo_dir" "$repo_dir/package-lock.json" npm ci ;;
   pnpm) install_if_needed "$repo_dir" "$repo_dir/pnpm-lock.yaml" pnpm install --frozen-lockfile ;;
