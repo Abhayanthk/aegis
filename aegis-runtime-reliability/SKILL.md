@@ -41,7 +41,11 @@ only the task needed for the current phase and give it only its matching
 playbook plus the required artifacts. Do not say a role was delegated unless a
 subagent task was actually created.
 
-At the start, launch these independent lanes in parallel:
+At the start, launch both subagent tasks before waiting for either result. The
+root agent must issue the two create-sub-agent calls back-to-back in the same
+orchestration turn; it must not create PREPARE only after ANALYZE finishes.
+
+Launch these independent lanes in parallel:
 
 1. **Repository Analyst:** inspect the repository without running application
    code; return suspects, entry point, health endpoint, package manager, and
@@ -99,10 +103,17 @@ outside the sandbox. Never put secrets in the sandbox.
    prepared runtime and installed dependency trees for every later phase;
    never reinstall, refresh, or repeat a successful install. Never ask the
    user to approve this sandbox-only setup. If setup fails, report the exact
-   error and stop; include the exact failed prerequisite or command. Only after
+   error and stop; include the exact failed prerequisite or command. The Root
+   Agent must never edit, normalize, or otherwise rewrite the Analyst artifact.
+   Only after
    this lane succeeds may the BASELINE profiler
    create the experiment config, run the target, and run tests.
-4. Wait for BOTH subagents to complete. DO NOT analyze the repository yourself. Extract the Analyst's structured JSON report verbatim. Then delegate to the Profiler (Baseline phase) and pass the raw JSON into its prompt so it can create the experiment config.
+4. Wait for BOTH subagents to complete. DO NOT analyze the repository yourself.
+   Read the Analyst artifact verbatim; do not patch its fields or create a
+   replacement report. Then delegate to the Profiler (Baseline phase) and pass
+   the absolute artifact paths into its prompt so it can create the experiment
+   config. Do not append guessed endpoints, commands, or other commentary to
+   the phase prompt.
 5. Run one baseline. Only after the baseline succeeds, present the required
    evidence and wait for explicit human approval before any target-code edit.
 
@@ -245,18 +256,17 @@ You are the Runtime Profiler for the BASELINE phase. Before any work, read
 {skill_dir}/references/baseline-playbook.md in full.
 
 You have zero memory of the prior conversation. You must use:
-Analyst Report: <INSERT RAW JSON OR ABSOLUTE PATH TO FILE>
+Analyst Report Artifact: <ABSOLUTE PATH TO analyst-report.json>
 Repository Path: <ABSOLUTE PATH TO REPO>
+Experiment Config: <ABSOLUTE PATH TO experiment-config.json>
 
-CREATE the experiment config and write it to: <ABSOLUTE PATH>/experiment-config.json
-<<<<<<< Updated upstream
+Read the Analyst Report Artifact and create the Experiment Config at the supplied
+absolute path. Do not use guessed or hard-coded endpoint details.
 Use the dependency trees prepared by the grouped setup phase. Do not run an
 install command in BASELINE; if the preparation marker is missing or invalid,
 stop and report that setup failure.
-=======
-Install the target repository dependencies using the package manager from the Analyst Report.
-
->>>>>>> Stashed changes
+Source the durable runtime environment and fail if sourcing fails:
+`source {skill_dir}/.aegis-node-env`.
 Then run the baseline experiment. Return the baseline phase JSON result. Do not interpret
 the verdict, alter target code, or replace a missing test command with a no-op.
 If the playbook cannot be read, stop and report that blocker.
@@ -269,7 +279,7 @@ You are the Runtime Profiler for the CANDIDATE phase. Before any work, read
 {skill_dir}/references/candidate-playbook.md in full.
 
 You have zero memory of the prior conversation. You must use:
-Analyst Report: <INSERT RAW JSON OR ABSOLUTE PATH TO FILE>
+Analyst Report Artifact: <ABSOLUTE PATH TO analyst-report.json>
 Baseline Metrics: <INSERT RAW JSON OR ABSOLUTE PATH TO baseline/metrics.json>
 Experiment Config: <ABSOLUTE PATH TO experiment-config.json>
 
@@ -376,11 +386,16 @@ node scripts/verify.mjs --baseline <baseline/metrics.json> \
    Do not repeatedly re-read files, re-install dependencies, or probe the same
    endpoint manually after the harness has produced evidence.
 
-9. **One bounded diagnosis loop.** Build the config once from the Analyst's
+9. **Keep handoffs compact.** Read each phase playbook once. Pass absolute
+    artifact paths, not pasted full playbook text or duplicated raw outputs.
+    Read the Analyst artifact once and forward it unchanged. Never add guessed
+    facts to a subagent prompt.
+
+10. **One bounded diagnosis loop.** Build the config once from the Analyst's
    report; on a harness failure, make one config/environment correction per
    retry and report the concrete error. After two setup failures, escalate
    rather than cycling through guesses.
 
-10. **No unverified completion claim.** State `VERIFIED` only after the
+11. **No unverified completion claim.** State `VERIFIED` only after the
     candidate metrics and verdict JSON both exist. Report raw values, not
     informal benchmark summaries, to the user.
